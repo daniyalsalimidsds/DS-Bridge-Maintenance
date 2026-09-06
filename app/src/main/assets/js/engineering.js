@@ -93,7 +93,7 @@
       '<div class="score-tile"><small>نمره منفی کلی پل</small><strong dir="ltr">'+number(m.total)+'</strong><span>مرجع '+number(m.referenceTotal)+' | تکمیلی '+number(m.supplementalTotal)+'</span></div>'+
       '<div class="score-tile"><small>پوشش مشاهده</small><strong>'+number(m.coverage)+'٪</strong><span>'+number(m.uninspectableCount)+' ع.ا.ب • '+number(m.pendingCount)+' بررسی‌نشده</span></div>'+
       '<div class="score-tile"><small>FHWA / SNBI</small><strong>'+esc(f.complete?f.condition:'ارزیابی ناقص')+'</strong><span>کمترین نمره ثبت‌شده: '+number(f.minimum)+' از ۹</span></div></div>'+
-      (m.emergencyCount || f.critical?'<div class="callout urgent"><b>نیاز به توجه فوری</b> '+number(m.emergencyCount)+' رخداد اضطراری؛ نتیجه عددی جای پیگیری فوری را نمی‌گیرد.</div>':'')+
+      (m.emergencyCount || f.critical?'<div class="callout urgent"><b>نیاز به توجه فوری</b> '+(m.emergencyCount?number(m.emergencyCount)+' رخداد اضطراری ثبت شده است. ':'')+(f.critical?'نمره بحرانی در ارزیابی اجزا ثبت شده است. ':'')+'نتیجه عددی جای پیگیری فوری را نمی‌گیرد.</div>':'')+
       (!m.complete?'<div class="callout caution">پوشش کامل نیست؛ عدد گزارش‌شده فقط بر مبنای اطلاعات ثبت‌شده است.</div>':'')+
       (m.legacy?'<div class="callout">بازتحلیل سابقه قدیمی؛ تأیید بررسی موارد پیش‌فرض «ندارد» در دسترس نیست.</div>':'')+'</div>';
   }

@@ -25,6 +25,7 @@ main{padding-bottom:calc(96px + env(safe-area-inset-bottom));scroll-padding-bloc
 .score-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:16px}
 .score-tile{display:flex;flex-direction:column;gap:6px;background:var(--card,#fff);border:1px solid var(--line,#d7e2e8);border-radius:14px;padding:16px;min-width:0}.score-tile small{color:var(--ink-muted);font-size:.78rem}.score-tile strong{font-size:1.45rem;line-height:1.65}.score-tile span{font-size:.72rem;color:var(--ink-muted)}
 .checklist-tools{display:flex;flex-wrap:wrap;gap:8px;margin-block:10px}.checklist-tools .btn{flex:1;min-width:150px}
+.section-title{flex-wrap:wrap;gap:6px 14px}.section-title small{max-width:100%;white-space:normal;overflow-wrap:anywhere}
 .checkcat{border-radius:16px;overflow:hidden;margin-block:14px}.checkcat-title{padding:16px;gap:12px;min-height:72px}.checkcat-title-main{align-items:flex-start}.checkcat-meta{flex:none}.checkcat-meta small{font-size:.7rem}
 .checkitem-title{align-items:flex-start}.checkitem-title h4{font-size:1rem;line-height:1.8}.checkitem{padding:16px 12px}.item-base-code,.category-code{font-size:.75rem;flex:none}
 .checkitem .marquee-text,.checkcat .marquee-text{white-space:normal;overflow:visible}.checkitem .marquee-track,.checkcat .marquee-track{display:block;animation:none!important;transform:none!important}.checkitem .marquee-track>span,.checkcat .marquee-track>span{white-space:normal}.checkitem .marquee-track>span[aria-hidden],.checkcat .marquee-track>span[aria-hidden]{display:none}

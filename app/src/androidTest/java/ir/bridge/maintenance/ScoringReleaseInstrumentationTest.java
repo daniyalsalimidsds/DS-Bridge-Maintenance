@@ -37,6 +37,10 @@ public class ScoringReleaseInstrumentationTest {
             assertEquals("ok",eval(scenario,"document.documentElement.scrollWidth<=window.innerWidth+2?'ok':'overflow'"));
             eval(scenario,"applyAppearance(normalizedAppearance({}));go('inspectionForm');'ok'");
             capture(scenario,"inspection-form.png");
+            eval(scenario,"document.querySelector('.checkitem').scrollIntoView({block:'start'});'ok'");
+            capture(scenario,"checklist-five-statuses.png");
+            eval(scenario,"document.getElementById('scorePreview').scrollIntoView({block:'start'});'ok'");
+            capture(scenario,"score-preview.png");
         }
     }
 
@@ -90,7 +94,7 @@ public class ScoringReleaseInstrumentationTest {
     private static byte[] read(java.io.InputStream in)throws Exception{try(java.io.InputStream input=in;java.io.ByteArrayOutputStream out=new java.io.ByteArrayOutputStream()){byte[] b=new byte[8192];int n;while((n=input.read(b))!=-1)out.write(b,0,n);return out.toByteArray();}}
     private static File qaDir(Context c){File f=new File(c.getFilesDir(),"QA160");f.mkdirs();return f;}
     private static void capture(ActivityScenario<MainActivity> s,String name)throws Exception{
-        SystemClock.sleep(500);AtomicReference<Exception> error=new AtomicReference<>();s.onActivity(a->{try{WebView web=find(a.findViewById(android.R.id.content));Bitmap b=Bitmap.createBitmap(web.getWidth(),web.getHeight(),Bitmap.Config.ARGB_8888);web.draw(new Canvas(b));try(FileOutputStream out=new FileOutputStream(new File(qaDir(a),name))){b.compress(Bitmap.CompressFormat.PNG,100,out);}b.recycle();}catch(Exception e){error.set(e);}});if(error.get()!=null)throw error.get();
+        SystemClock.sleep(3000);AtomicReference<Exception> error=new AtomicReference<>();s.onActivity(a->{try{WebView web=find(a.findViewById(android.R.id.content));Bitmap b=Bitmap.createBitmap(web.getWidth(),web.getHeight(),Bitmap.Config.ARGB_8888);web.draw(new Canvas(b));try(FileOutputStream out=new FileOutputStream(new File(qaDir(a),name))){b.compress(Bitmap.CompressFormat.PNG,100,out);}b.recycle();}catch(Exception e){error.set(e);}});if(error.get()!=null)throw error.get();
     }
     private static void ready(ActivityScenario<MainActivity> s)throws Exception{long until=SystemClock.elapsedRealtime()+15000;while(SystemClock.elapsedRealtime()<until){if("ready".equals(eval(s,"document.readyState==='complete'&&typeof BridgeScoring==='object'&&typeof newInspection==='function'?'ready':'wait'")))return;SystemClock.sleep(150);}fail("App did not become ready");}
     private static String eval(ActivityScenario<MainActivity> s,String js)throws Exception{AtomicReference<String> result=new AtomicReference<>();CountDownLatch latch=new CountDownLatch(1);s.onActivity(a->find(a.findViewById(android.R.id.content)).evaluateJavascript(js,r->{try{result.set(r!=null&&r.startsWith("\"")?new JSONArray("["+r+"]").getString(0):r);}catch(Exception e){result.set(r);}latch.countDown();}));assertTrue(latch.await(20,TimeUnit.SECONDS));return result.get();}

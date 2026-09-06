@@ -3,6 +3,7 @@
 
   let bridgeEditorId = '';
   let pendingBridgeLocation = null;
+  let bridgeGpsRequest = null, bridgeGpsSequence = 0;
   const tagLabels = Object.freeze({
     road:'راهی', railway:'راه‌آهن', concrete:'بتنی', prestressed:'پیش‌تنیده', steel:'فولادی', masonry:'بنایی', timber:'چوبی',
     composite:'مختلط/کامپوزیت', frp:'FRP', orthotropic:'عرشه ارتوتروپیک', truss:'خرپایی', arch:'قوسی', cable:'کابلی', box:'جعبه‌ای', girder:'تیری', culvert:'آبرو',
@@ -68,9 +69,14 @@
     host.innerHTML = (schema?.sections || []).map((section, index) => `<details class="profile-section" ${index < 2 ? 'open' : ''}><summary><span>${faNum(index + 1)}. ${esc(section.title)}</span><small>${faNum((section.fields || []).length)} فیلد</small></summary><div class="form-grid">${(section.fields || []).map(field => `<div class="field"><label>${esc(field.label)}${field.required ? ' *' : ''}</label>${fieldControl(field, profile[field.id])}</div>`).join('')}</div></details>`).join('');
     pendingBridgeLocation = bridge?.location ? { ...bridge.location } : null;
     refreshBridgeLocationEditor();
+    ['bridgeLatitude','bridgeLongitude'].forEach(id=>{
+      const control=document.getElementById(id);
+      if(control)control.oninput=()=>{bridgeGpsRequest=null;};
+    });
   }
 
   function editBridge(bridgeId = '') {
+    bridgeGpsRequest = null;
     bridgeEditorId = bridgeId;
     const bridge = bridgeId ? dbList('bridges').find(item => item.id === bridgeId) : null;
     const title = document.getElementById('bridgeFormTitle');
@@ -124,9 +130,10 @@
   }
 
   function collectManualLocation() {
-    const latText = enNum(document.getElementById('bridgeLatitude')?.value || '');
-    const lonText = enNum(document.getElementById('bridgeLongitude')?.value || '');
+    const latText = enNum(document.getElementById('bridgeLatitude')?.value || '').trim();
+    const lonText = enNum(document.getElementById('bridgeLongitude')?.value || '').trim();
     if (!latText && !lonText) return null;
+    if (!latText || !lonText) throw new Error('عرض و طول جغرافیایی را هر دو وارد کنید.');
     const lat = Number(latText), lon = Number(lonText);
     if (!Number.isFinite(lat) || lat < -90 || lat > 90) throw new Error('عرض جغرافیایی باید بین ۹۰- و ۹۰ درجه باشد.');
     if (!Number.isFinite(lon) || lon < -180 || lon > 180) throw new Error('طول جغرافیایی باید بین ۱۸۰- و ۱۸۰ درجه باشد.');
@@ -173,6 +180,7 @@
       updatedAt: Date.now(),
     };
     dbSave('bridges', bridge);
+    bridgeGpsRequest = null;
     audit(prior ? 'ویرایش پل' : 'افزودن پل', 'bridges', bridge.id, `${name}${code ? ' • ' + code : ''}`);
     bridgeEditorId = bridge.id;
     toast(prior ? 'شناسنامه پل ویرایش شد.' : 'پل با موفقیت ثبت شد.');
@@ -190,15 +198,19 @@
   }
 
   function captureBridgeLocation() {
+    bridgeGpsRequest = { target:'bridge-profile-'+Date.now().toString(36)+'-'+(++bridgeGpsSequence).toString(36), bridgeId:bridgeEditorId };
     const state = document.getElementById('bridgeLocationState');
     if (state) state.textContent = 'در حال دریافت موقعیت GPS…';
-    if (!Native?.isNative?.() || !Native.requestLocation({ target: 'bridge-profile' })) {
+    if (!Native?.isNative?.() || !Native.requestLocation({ target: bridgeGpsRequest.target })) {
+      bridgeGpsRequest = null;
       if (state) state.textContent = 'GPS فقط در نسخه اندروید در دسترس است؛ مختصات را دستی وارد کنید.';
       toast('دریافت GPS آغاز نشد. ورود دستی مختصات همچنان در دسترس است.');
     }
   }
 
   function receiveBridgeLocationResult(result) {
+    if (!bridgeGpsRequest || result?.target!==bridgeGpsRequest.target || bridgeGpsRequest.bridgeId!==bridgeEditorId) return;
+    bridgeGpsRequest = null;
     if (!result?.ok) {
       const messages = {
         'permission-denied': 'مجوز موقعیت مکانی داده نشد.',
@@ -214,17 +226,13 @@
       toast(message);
       return;
     }
-    const lat = Number(result.lat), lon = Number(result.lon);
-    if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
-      toast('مختصات GPS معتبر نیست.');
+    const normalized = window.normalizeOccurrenceLocation(result);
+    if (!normalized || normalized.mock || Math.abs(Date.now()-normalized.capturedAt)>120000) {
+      toast('مختصات GPS باید معتبر، تازه و غیرشبیه‌سازی‌شده باشد.');
       return;
     }
     pendingBridgeLocation = {
-      lat,
-      lon,
-      accuracyM: Number.isFinite(Number(result.accuracyM)) ? Number(result.accuracyM) : null,
-      capturedAt: Number(result.capturedAt) || Date.now(),
-      provider: result.provider || 'gps',
+      ...normalized,
       source: 'gps',
     };
     refreshBridgeLocationEditor();
@@ -232,6 +240,7 @@
   }
 
   function clearBridgeLocation() {
+    bridgeGpsRequest = null;
     pendingBridgeLocation = null;
     refreshBridgeLocationEditor();
   }

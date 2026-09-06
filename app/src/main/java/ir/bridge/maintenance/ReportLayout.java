@@ -35,7 +35,7 @@ final class ReportLayout {
     private static TextPaint paint(Typeface font,float size){TextPaint p=new TextPaint(Paint.ANTI_ALIAS_FLAG);p.setTypeface(font);p.setTextSize(size);p.setColor(0xff20343e);return p;}
     private static StaticLayout layout(String value,TextPaint p,float width) {
         return StaticLayout.Builder.obtain(value,0,value.length(),p,Math.max(1,(int)width-12))
-            .setAlignment(Layout.Alignment.ALIGN_NORMAL).setTextDirection(TextDirectionHeuristics.FIRSTSTRONG_RTL)
+            .setAlignment(Layout.Alignment.ALIGN_NORMAL).setTextDirection(TextDirectionHeuristics.FIRSTSTRONG_LTR)
             .setIncludePad(false).setLineSpacing(2,1).build();
     }
     private static double[] widths(JSONArray rows,boolean profile) {

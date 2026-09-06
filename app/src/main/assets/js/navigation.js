@@ -31,6 +31,7 @@
     if(current==='inspectionForm' && p!==current)window.flushInspectionAutosave?.();
     document.querySelectorAll('.page').forEach(x => x.classList.remove('active'));
     el.classList.add('active');
+    const fab=document.querySelector('.fab');if(fab)fab.hidden=['academy','guide','inspectionForm','bridgeForm'].includes(p);
     const title = document.getElementById('pageTitle'); if (title) title.textContent = (window.pageNames || {})[p] || '';
     closeDrawers(); closeOpenSheetsExcept(null);
     const main = document.querySelector('main'); if (main) main.scrollTo({top:0, behavior:'auto'});
