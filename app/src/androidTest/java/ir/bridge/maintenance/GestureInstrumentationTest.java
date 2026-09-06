@@ -130,7 +130,7 @@ public class GestureInstrumentationTest {
     private static void waitForWebAppReady(ActivityScenario<MainActivity> s) throws Exception {
         String readyJs = "(()=>{try{return document.readyState==='complete'&&" +
                 "typeof window.BridgeNativeClient==='object'&&" +
-                "window.BridgeNativeClient.appVersion().indexOf('1.5.0')===0&&" +
+                "window.BridgeNativeClient.appVersion().indexOf('1.6.0')===0&&" +
                 "typeof window.newInspection==='function'&&typeof window.openDrawer==='function'&&" +
                 "typeof window.closeDrawers==='function'&&typeof window.compareChecklistCodes==='function'&&" +
                 "typeof window.initSwipeNavigation==='function'&&window.initSwipeNavigation._done===true?" +

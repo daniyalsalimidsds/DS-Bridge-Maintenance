@@ -912,7 +912,7 @@ function renderDefects() {
 function viewInspection(recordId) {
   const record = dbList('inspections').find(item => item.id === recordId);
   if (!record) return;
-  const damaged = (record.items || []).filter(item => item.applicable!==false && (severityRank(item.statusId || item.status) > 0 || severityId(item.statusId || item.status)==='uninspectable')); 
+  const damaged = (record.items || []).filter(item => item.applicable!==false && (severityRank(item.statusId || item.status) > 0 || severityId(item.statusId || item.status)==='uninspectable'));
   const bridgeLine = [record.bridgeName, record.bridgeCode, record.bridgeUse].filter(Boolean).map(esc).join(' • ');
   showGeneric('جزئیات بازدید', `<div class="rolebox"><b>${esc(record.no || '')}</b><div class="muted">${esc(record.jdate || '')} • ${bridgeLine} • ${esc(record.inspector || '')}</div></div>
     ${window.engineeringSummaryHtml?.(record) || ''}

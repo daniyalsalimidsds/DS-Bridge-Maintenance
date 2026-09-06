@@ -34,7 +34,17 @@ adb install --no-streaming -r "$APP_APK"
 wait_for_android_runtime
 adb install --no-streaming -r "$TEST_APK"
 
-trap 'adb pull /sdcard/Android/data/ir.bridge.maintenance/files/QA160 qa-artifacts >/dev/null 2>&1 || true' EXIT
+collect_qa_artifacts() {
+  mkdir -p qa-artifacts
+  # Export only fixtures produced by this debuggable application's own tests.
+  # run-as avoids Android scoped-storage restrictions on external adb pull.
+  if adb exec-out run-as ir.bridge.maintenance tar -C files -cf - QA160 > qa-artifacts/qa160.tar; then
+    tar -xf qa-artifacts/qa160.tar -C qa-artifacts
+    rm qa-artifacts/qa160.tar
+  fi
+  adb logcat -d -s chromium AndroidRuntime > qa-artifacts/webview-logcat.txt || true
+}
+trap collect_qa_artifacts EXIT
 set +e
 adb shell am instrument -w ir.bridge.maintenance.test/androidx.test.runner.AndroidJUnitRunner > instrumentation.log 2>&1
 status=$?

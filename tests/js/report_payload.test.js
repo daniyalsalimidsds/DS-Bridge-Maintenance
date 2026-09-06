@@ -8,7 +8,7 @@ const rows=ctx.bridgeReportRows([record]);
 assert(rows.length>10);assert.strictEqual(rows[0].length,10);assert(rows.every(row=>row.length===rows[0].length));
 const data=rows.find(row=>typeof row[0]==='number');assert(data);
 const summary=rows.find(row=>row[3]==='نمره منفی کلی پل');assert.equal(summary[7],-40);
-assert(!rows[0].includes('نام تصویر')); 
+assert(!rows[0].includes('نام تصویر'));
 for(const header of ['گروه بازرسی','سطح آسیب','ضریب اهمیت','نمره منظورشده'])assert(rows[0].includes(header),header);
 for(const removed of ['نام پل','کد پل','کاربری پل','نوع بازدید'])assert(!rows[0].includes(removed),removed);
 assert(!rows[0].includes('مختصات پل'));assert(!rows[0].includes('اقدام اصلاحی'));assert(!rows[0].includes('مسئول پیگیری'));assert(!rows[0].includes('شماره گزارش'));assert(!rows[0].includes('بازرس'));
@@ -22,4 +22,9 @@ const sorted=ctx.bridgeReportRows([{...record,items:[
   {itemId:'concrete-4',code:'1.4',statusId:'medium'},
 ]}]).filter(row=>typeof row[0]==='number').map(row=>row[4]);
 assert.strictEqual(sorted.join('|'),'اضطراری|متوسط|کم|ندارد');
+const historical=ctx.bridgeReportRows([{...record,items:[{itemId:'concrete-1',statusId:'none'}]}]);
+assert.equal(historical.find(row=>typeof row[0]==='number')[7],'');
+assert.equal(rows.at(-1)[3],'نمره منفی کلی پل');
+const zero=ctx.bridgeReportRows([{...record,internationalAssessment:{components:{deck:{rating:0,note:'پل بسته؛ جایگزینی لازم است'}}}}]);
+assert(zero.find(row=>row[3].startsWith('B.C.01'))[7].startsWith('0 •'));
 console.log('report_payload.test.js PASS');

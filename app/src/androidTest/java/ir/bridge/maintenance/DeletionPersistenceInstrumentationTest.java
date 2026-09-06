@@ -49,14 +49,16 @@ public class DeletionPersistenceInstrumentationTest {
     }
 
     private static void waitReady(ActivityScenario<MainActivity> scenario) throws Exception {
-        long deadline = SystemClock.elapsedRealtime() + 15000;
+        // The first WebView process on a newly booted CI emulator needs more
+        // time than subsequent launches; keep the functional assertions intact.
+        long deadline = SystemClock.elapsedRealtime() + 30000;
         String value = "";
         while (SystemClock.elapsedRealtime() < deadline) {
             value = eval(scenario, "document.readyState==='complete'&&typeof dbList==='function'&&typeof newInspection==='function'?'ready':'wait'");
             if ("ready".equals(value)) return;
             SystemClock.sleep(150);
         }
-        assertEquals("ready", value);
+        assertEquals("Startup diagnostics: " + eval(scenario, "JSON.stringify({state:document.readyState,url:location.href,db:typeof dbList,inspection:typeof newInspection,version:window.BridgeNativeClient?.appVersion()})"), "ready", value);
     }
 
     private static String eval(ActivityScenario<MainActivity> scenario, String js) throws Exception {

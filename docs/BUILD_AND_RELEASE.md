@@ -1,45 +1,54 @@
-# ساخت، آزمون و انتشار
+# ساخت و تحویل ۱.۶.۰
 
-## پیش‌نیازها
+## پیش‌نیاز و ساخت
 
-- JDK 17
-- Android SDK 35 و Build Tools 35.0.0
-- Node.js 20 یا جدیدتر
-- Python 3.11+ با `openpyxl` فقط برای بازتولید شِما
-
-## بازتولید شِمای اکسل
+JDK 17، Android SDK 35، Build Tools 35.0.0، Node.js 20+ و Python 3.11+ لازم‌اند. `openpyxl` فقط برای بازتولید استخراج اکسل لازم است. وابستگی جدیدی به runtime برنامه افزوده نشده است.
 
 ```bash
-python3 tools/generate_bridge_schema.py \
-  reference/شناسنامه_فنی_پل_نشریه_367.xlsx \
-  app/src/main/assets/data/bridge-profile-schema.js
-```
-
-## کنترل و ساخت
-
-```bash
-python3 tools/check_bridge_source.py
 node --test tests/js/*.test.js
-./gradlew testDebugUnitTest lintRelease assembleDebugAndroidTest assembleRelease
+python3 tools/check_bridge_source.py
+./gradlew --no-daemon testDebugUnitTest lintRelease assembleDebug assembleDebugAndroidTest assembleRelease
 ```
 
-APK بدون امضا در `app/build/outputs/apk/release/app-release-unsigned.apk` ساخته می‌شود. CI هویت `ir.bridge.maintenance`، نسخه `1.5.0` و `versionCode 10500` را با `aapt` کنترل می‌کند.
+خروجی انتشار: `app/build/outputs/apk/release/app-release-unsigned.apk`. هویت قابل انتظار: `ir.bridge.maintenance`، `versionName=1.6.0`، `versionCode=10600`. CI هویت و zip alignment را بررسی می‌کند.
 
-## امضا
+## آزمون اندروید
 
-کلید خصوصی نباید commit شود. Gradle فقط وقتی چهار property زیر ارائه شوند release را امضا می‌کند:
-
-- `BRIDGE_STORE_FILE`
-- `BRIDGE_STORE_PASSWORD`
-- `BRIDGE_KEY_ALIAS`
-- `BRIDGE_KEY_PASSWORD`
-
-پس از امضا این کنترل‌ها انجام شوند:
+پس از روشن‌کردن شبیه‌ساز یا اتصال دستگاه مجاز:
 
 ```bash
-apksigner verify --verbose --print-certs Bridge_Maintenance_v1.5.0.apk
-zipalign -c -p 4 Bridge_Maintenance_v1.5.0.apk
-sha256sum Bridge_Maintenance_v1.5.0.apk
+bash tools/run_direct_instrumentation.sh
 ```
 
-فایل credential تحویلی باید جدا از APK نگهداری شود و دسترسی آن محدود باشد. از یک کلید ثابت برای تمام به‌روزرسانی‌های بعدی همین applicationId استفاده کنید؛ گم‌شدن کلید، به‌روزرسانی مستقیم نسخه نصب‌شده را مختل می‌کند.
+آزمون‌ها شامل پایگاه داده، مهاجرت، حذف، پشتیبان/بازیابی، گزارش، امضا و تعامل فرم هستند. آزمون‌های ۱.۶.۰ خروجی‌های فارسی بسیار بلند و تصاویر حالت روز/شب و متن بزرگ را در `qa-artifacts/` ذخیره می‌کنند. نتیجه موفق ساخت به‌تنهایی نتیجه موفق آزمون اندروید نیست؛ هر دو job در CI باید موفق باشند.
+
+## بازتولید داده مرجع
+
+```bash
+python3 tools/generate_bridge_schema.py reference/شناسنامه_فنی_پل_نشریه_367.xlsx app/src/main/assets/data/bridge-profile-schema.js
+python3 tools/import_municipal_catalog.py /path/to/VELAYAT.xlsx
+node tools/audit_scoring_catalog.js
+```
+
+فایل خام VELAYAT حاوی عکس و اطلاعات پل است و به مخزن اضافه نشده؛ کاتالوگ استخراج‌شده، نشانی سلول‌ها و SHA-256 آن ثبت شده‌اند و برای ساخت برنامه کافی‌اند. ابزار استخراج ورودی را تغییر نمی‌دهد. ممیزی تولیدشده را پس از هر تغییر نگاشت بازبینی کنید.
+
+## امضا و نصب ارتقا
+
+کلید ثابت نسخه ۱.۵.۰ را بیرون مخزن نگه دارید. Gradle در صورت وجود چهار property زیر release را امضا می‌کند. مقدار رمزها را در فایل خصوصی Gradle با دسترسی محدود قرار دهید؛ آن‌ها را در فرمان قابل ثبت در تاریخچه ننویسید.
+
+```properties
+BRIDGE_STORE_FILE=/private/path/release.jks
+BRIDGE_STORE_PASSWORD=YOUR_PRIVATE_VALUE
+BRIDGE_KEY_ALIAS=YOUR_EXISTING_ALIAS
+BRIDGE_KEY_PASSWORD=YOUR_PRIVATE_VALUE
+```
+
+برای امضای APK از قبل ساخته‌شده، ابتدا zipalign و سپس apksigner اجرا شود. پس از امضا:
+
+```bash
+apksigner verify --verbose --print-certs Bridge_Maintenance_v1.6.0.apk
+zipalign -c -p 4 Bridge_Maintenance_v1.6.0.apk
+sha256sum Bridge_Maintenance_v1.6.0.apk
+```
+
+اثر انگشت گواهی را با APK نسخه ۱.۵.۰ مقایسه کنید. پیش از نصب ارتقا از داخل برنامه پشتیبان کامل بگیرید و APK جدید را روی نسخه موجود نصب کنید. حذف برنامه اطلاعات محلی آن را حذف می‌کند؛ برای ارتقا نیازی به حذف نیست. آزمون عملی دوربین، GPS واقعی، اشتراک‌گذاری و نصب روی دستگاه مقصد بخشی از پذیرش میدانی است.

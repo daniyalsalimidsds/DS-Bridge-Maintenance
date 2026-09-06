@@ -16,7 +16,7 @@ assert(reports.includes('severitySort')&&reports.includes('compareCodes(itemOccu
 assert(gestures.includes("touchstart")&&gestures.includes("touchmove")&&gestures.includes("openDrawer('left')")&&gestures.includes("openDrawer('right')"));
 assert(reportJava.includes('measureRtlHeight')&&reportJava.includes('xlsxStyles')&&reportJava.includes('xl/worksheets/sheet3.xml'));
 assert(!reportJava.includes('"GPS پل"')&&!reportJava.includes('"اقدام / مسئول"'));
-assert(reportJava.includes('ReportLayout.writePdf')); 
+assert(reportJava.includes('ReportLayout.writePdf'));
 assert(reportJava.includes('sanitizeChecklistRows')&&reportJava.includes('isChecklistMetadataHeader')&&reportJava.includes('تاریخ'));
 for(const header of ['نام پل','کد پل','کاربری پل','نوع بازدید'])assert(reports.includes(header));
 assert(reportJava.includes('data/bridges.json')&&reportJava.includes('bridge-inspection-report.csv'));

@@ -88,7 +88,7 @@ public class ScoringReleaseInstrumentationTest {
         for(File f:new File[]{xlsx,pdf,csv})java.nio.file.Files.copy(f.toPath(),new File(qaDir(c),f.getName()).toPath(),java.nio.file.StandardCopyOption.REPLACE_EXISTING);
     }
     private static byte[] read(java.io.InputStream in)throws Exception{try(java.io.InputStream input=in;java.io.ByteArrayOutputStream out=new java.io.ByteArrayOutputStream()){byte[] b=new byte[8192];int n;while((n=input.read(b))!=-1)out.write(b,0,n);return out.toByteArray();}}
-    private static File qaDir(Context c){File f=new File(c.getExternalFilesDir(null),"QA160");f.mkdirs();return f;}
+    private static File qaDir(Context c){File f=new File(c.getFilesDir(),"QA160");f.mkdirs();return f;}
     private static void capture(ActivityScenario<MainActivity> s,String name)throws Exception{
         SystemClock.sleep(500);AtomicReference<Exception> error=new AtomicReference<>();s.onActivity(a->{try{WebView web=find(a.findViewById(android.R.id.content));Bitmap b=Bitmap.createBitmap(web.getWidth(),web.getHeight(),Bitmap.Config.ARGB_8888);web.draw(new Canvas(b));try(FileOutputStream out=new FileOutputStream(new File(qaDir(a),name))){b.compress(Bitmap.CompressFormat.PNG,100,out);}b.recycle();}catch(Exception e){error.set(e);}});if(error.get()!=null)throw error.get();
     }

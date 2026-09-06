@@ -135,7 +135,6 @@
     if(!result)return [];
     const m=result.municipal, f=result.international;
     const pairs=[
-      ['نمره منفی کلی پل',m.total ?? 'محاسبه نشده'],
       ['سهم فهرست مرجع شهرداری',m.referenceTotal],['سهم آسیب‌های تکمیلی؛ ضرایب پیشنهادی',m.supplementalTotal],
       ['کسری وزنی سفارشی (۰ تا ۱۰۰؛ درصد سلامت نیست)',m.normalizedDeficit==null?'نامشخص':Number(m.normalizedDeficit.toFixed(2))],
       ['پوشش مشاهده (درصد رخدادها)',m.coverage==null?'نامشخص':Number(m.coverage.toFixed(2))],
@@ -146,7 +145,8 @@
     ];
     window.BridgeScoring.COMPONENTS.forEach(c=>{
       const x=f.componentRatings[c.id];
-      pairs.push([c.code+' — '+c.name,(x?.rating && x.rating!=='U'?x.rating:'ارزیابی نشده')+(x?.note?' • '+x.note:'')]);
+      const rating=String(x?.rating ?? 'U');
+      pairs.push([c.code+' — '+c.name,(rating!=='U' && rating!==''?rating:'ارزیابی نشده')+(x?.note?' • '+x.note:'')]);
     });
     (result.elements || []).forEach(e=>{
       pairs.push(['عنصر: '+e.name+' — '+e.unit,e.result.valid?'کل: '+e.total+' | CS1: '+e.cs1+' | CS2: '+e.cs2+' | CS3: '+e.cs3+' | CS4: '+e.cs4+' | CS3+CS4: '+e.result.cs34Percent.toFixed(2)+'٪':'ارزیابی مقدار نامعتبر']);
@@ -154,6 +154,7 @@
     });
     pairs.push(['قاعده جمع','هر کلید امتیاز یک‌بار و با شدیدترین رخداد محاسبه می‌شود. ع.ا.ب معادل سالم نیست.']);
     pairs.push(['شناسایی روش','۱.۶.۰ | VELAYAT.xlsx | '+window.BRIDGE_MUNICIPAL_CATALOG?.sourceSha256]);
+    pairs.push(['نمره منفی کلی پل',m.total ?? 'محاسبه نشده']);
     return pairs.map(([label,value])=>{
       const row=Array(width).fill('');row[3]=label;row[7]=value;return row;
     });
@@ -182,7 +183,7 @@
         const legacyPending=result?.municipal.legacy && severityId(item.statusId || item.status)==='none' && item.assessed!==true;
         const status=item.applicable===false?'کاربرد ندارد':item.assessed===false || legacyPending || !window.severityKnown(item.statusId || item.status)?'بررسی نشده':severityLabel(item.statusId || item.status || 'none');
         rows.push([++rowNumber,itemOccurrenceCode(item),group===previousGroup?'':group,item.itemName || d.item,
-          status,score?.weight ?? '',key,counted?penalty:score?.applicable && score.assessed?0:'',
+          status,score?.weight ?? '',key,legacyPending?'':counted?penalty:score?.applicable && score.assessed?0:'',
           gpsLocation(item.location || item.gpsLocation),item.note || '',imageCell(record,item,item.photos || [])]);
         previousGroup=group;
       });
