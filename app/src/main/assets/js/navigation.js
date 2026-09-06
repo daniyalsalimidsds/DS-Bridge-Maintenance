@@ -42,6 +42,7 @@
     }
     window.currentPage = p;
     renderDestination(p);
+    if(p==='inspectionForm')window.scheduleScorePreview?.();
     return true;
   }
   window.go = p => showPage(p, true);

@@ -39,8 +39,10 @@ public class ScoringReleaseInstrumentationTest {
             capture(scenario,"inspection-form.png");
             eval(scenario,"document.querySelector('.checkitem').scrollIntoView({block:'start'});'ok'");
             capture(scenario,"checklist-five-statuses.png");
+            assertEquals("ok",eval(scenario,"(()=>{const h=document.querySelector('.checkitem-title h4'),t=h.querySelector('.marquee-track>span'),b=h.getBoundingClientRect(),r=t.getBoundingClientRect();return r.left>=b.left-1&&r.right<=b.right+1&&t.scrollWidth<=t.clientWidth+1?'ok':'clipped-title'})()"));
             eval(scenario,"document.getElementById('scorePreview').scrollIntoView({block:'start'});'ok'");
             capture(scenario,"score-preview.png");
+            assertEquals("ok",eval(scenario,"(()=>{const total=BridgeScoring.municipal({...currentInspection,items:collectInspectionItems()}).total,shown=document.querySelector('#scorePreview .score-tile strong').textContent;return total<0&&shown===faNum(Number(total).toLocaleString('en-US',{maximumFractionDigits:1}))?'ok':'stale-score:'+shown})()"));
         }
     }
 

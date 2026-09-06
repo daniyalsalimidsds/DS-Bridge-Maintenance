@@ -545,6 +545,7 @@ function addChecklistOccurrence(itemIdValue) {
   wrap.insertAdjacentHTML('beforeend', occurrenceTemplate(item, index, { occurrenceIndex: index, statusId: 'none' }));
   refreshItemPhotos(occurrenceKey(itemIdValue, index));
   window.autosaveCurrentInspection?.();
+  window.scheduleScorePreview?.();
 }
 
 function removeChecklistOccurrence(itemIdValue, index) {
@@ -565,6 +566,7 @@ function removeChecklistOccurrence(itemIdValue, index) {
   // Occurrence indices are stable identities: never renumber photos, GPS or callbacks.
   if(currentInspection) currentInspection.items=(currentInspection.items || []).filter(item=>!(item.itemId===itemIdValue && Number(item.occurrenceIndex)===Number(index)));
   window.autosaveCurrentInspection?.();
+  window.scheduleScorePreview?.();
 }
 
 function chooseSeverity(button, itemIdValue, severity) {

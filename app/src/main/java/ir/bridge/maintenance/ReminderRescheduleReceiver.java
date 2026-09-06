@@ -12,6 +12,10 @@ import org.json.JSONObject;
 /** Recreates persisted reminder alarms after reboot, app replacement, or clock/timezone changes. */
 public final class ReminderRescheduleReceiver extends BroadcastReceiver {
     @Override public void onReceive(Context context, Intent intent) {
+        if (intent == null) return;
+        String action = intent.getAction();
+        if (!Intent.ACTION_BOOT_COMPLETED.equals(action) && !Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)
+                && !Intent.ACTION_TIME_CHANGED.equals(action) && !Intent.ACTION_TIMEZONE_CHANGED.equals(action)) return;
         final PendingResult pending = goAsync();
         new Thread(() -> {
             try (AppDb db = new AppDb(context.getApplicationContext())) {

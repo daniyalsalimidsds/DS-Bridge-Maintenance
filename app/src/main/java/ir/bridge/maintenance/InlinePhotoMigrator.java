@@ -23,7 +23,7 @@ public final class InlinePhotoMigrator {
         java.util.ArrayList<String> keys=new java.util.ArrayList<>();Iterator<String> it=o.keys();while(it.hasNext())keys.add(it.next());java.util.Collections.sort(keys);for(String k:keys){if("data".equals(k))continue;Object v=o.opt(k);String child=path+"."+k;if(v instanceof JSONObject)migrateObject((JSONObject)v,ownerKind,ownerId,date,localName,child,c);else if(v instanceof JSONArray)migrateArray((JSONArray)v,ownerKind,ownerId,date,localName,child,c);}
     }
     private void migrateArray(JSONArray a,String ownerKind,String ownerId,String date,String name,String path,Counter c)throws Exception{for(int i=0;i<a.length();i++){Object v=a.opt(i);String child=path+"["+i+"]";if(v instanceof JSONObject)migrateObject((JSONObject)v,ownerKind,ownerId,date,name,child,c);else if(v instanceof JSONArray)migrateArray((JSONArray)v,ownerKind,ownerId,date,name,child,c);}}
-    private static boolean looksLikeSignature(JSONObject o){String t=(o.optString("type")+" "+o.optString("kind")+" "+o.optString("name")).toLowerCase();return t.contains("signature")||t.contains("امضا");}
+    private static boolean looksLikeSignature(JSONObject o){String t=(o.optString("type")+" "+o.optString("kind")+" "+o.optString("name")).toLowerCase(java.util.Locale.ROOT);return t.contains("signature")||t.contains("امضا");}
     private static String firstNonEmpty(String...v){for(String s:v)if(s!=null&&!s.trim().isEmpty())return s.trim();return "";}
     private static final class Counter{boolean changed;int count;int sequence;}
     public static final class MigrationResult{public final int entitiesChanged,photosMoved,failures;MigrationResult(int a,int b,int c){entitiesChanged=a;photosMoved=b;failures=c;}}
