@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 120" role="img" aria-labelledby="title desc">
+  <title id="title">نشان بازرسی پل</title>
+  <desc id="desc">پل قوسی با نماد کنترل بازرسی</desc>
+  <defs>
+    <linearGradient id="deck" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#58d0bd"/>
+      <stop offset="1" stop-color="#0f786b"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="144" height="104" rx="26" fill="#0b2739" stroke="#ffffff" stroke-opacity=".28" stroke-width="2"/>
+  <path d="M26 49h108v12H26z" fill="url(#deck)"/>
+  <path d="M34 61v31M126 61v31" stroke="#f4f8f8" stroke-width="7" stroke-linecap="round"/>
+  <path d="M40 90c8-30 27-42 40-42s32 12 40 42" fill="none" stroke="#f4f8f8" stroke-width="8" stroke-linecap="round"/>
+  <path d="M18 94h124" stroke="#d49b38" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="119" cy="31" r="18" fill="#d49b38" stroke="#0b2739" stroke-width="4"/>
+  <path d="m110 31 6 6 12-14" fill="none" stroke="#0b2739" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

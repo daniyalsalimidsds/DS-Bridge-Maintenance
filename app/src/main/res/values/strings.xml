@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">بازرسی پل</string>
+    <string name="notification_channel">یادآورهای نگهداری و بازرسی پل</string>
+    <string name="provider_authority">ir.bridge.maintenance.files</string>
+</resources>

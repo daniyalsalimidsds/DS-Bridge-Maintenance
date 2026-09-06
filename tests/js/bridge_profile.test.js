@@ -1,0 +1,17 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const ctx={};ctx.window=ctx;vm.createContext(ctx);
+vm.runInContext(fs.readFileSync('app/src/main/assets/data/bridge-profile-schema.js','utf8'),ctx);
+const schema=ctx.BRIDGE_PROFILE_SCHEMA;
+assert.strictEqual(schema.version,'367-menu-profile-v1');
+assert.strictEqual(schema.sections.length,20);
+const fields=schema.sections.flatMap(s=>s.fields);
+assert.strictEqual(fields.length,60);
+assert.strictEqual(fields.find(f=>f.label==='نام پل').required,true);
+assert.strictEqual(fields.find(f=>f.label==='کاربری اصلی').required,true);
+assert.deepStrictEqual(Array.from(fields.find(f=>f.label==='کاربری اصلی').options),['راه','راه‌آهن','شهری','موارد ویژه']);
+assert(fields.filter(f=>f.kind==='select').length>=40);
+assert(fields.filter(f=>f.kind==='select').every(f=>f.options.length>=3));
+assert(fields.every(f=>f.default===''||f.default==null));
+assert(/^[a-f0-9]{64}$/.test(schema.sourceSha256));
+assert.deepStrictEqual(Array.from(schema.locationFields).map(f=>f.id),['latitude','longitude','accuracyM','capturedAt','source']);
+console.log('bridge_profile.test.js PASS');

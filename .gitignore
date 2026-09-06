@@ -1,0 +1,32 @@
+# Android / Gradle outputs
+.gradle/
+**/build/
+local.properties
+
+# IDE and operating-system metadata
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Test and diagnostic logs
+*.log
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Release credentials and private keys
+*.jks
+*.keystore
+*.p12
+*.pfx
+keystore.properties
+signing.properties
+
+# Local delivery bundles
+release-artifacts/
+delivery/
+
+# User supplied workbook (contains site photos); extracted catalog and source hash are tracked.
+reference/VELAYAT.xlsx
+bridge-work/
