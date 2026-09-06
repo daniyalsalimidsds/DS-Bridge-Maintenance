@@ -137,6 +137,7 @@ jobs:
           path: |
             instrumentation-build.log
             instrumentation.log
+            qa-artifacts/
             app/build/reports/androidTests/
           if-no-files-found: ignore
           retention-days: 14

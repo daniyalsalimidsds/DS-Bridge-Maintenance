@@ -146,14 +146,15 @@ final class ReportLayout {
 
     static void writePdf(Context context,File out,JSONObject meta,JSONArray report,JSONArray profile,JSONArray checklist)throws Exception {
         Typeface font=Typeface.createFromAsset(context.getAssets(),"fonts/Vazirmatn.ttf");
-        try(PdfDocument document=new PdfDocument()){
+        PdfDocument document=new PdfDocument();
+        try{
             Pager pager=new Pager(document,meta,font);
             pager.table("مشخصات گزارش",report,true);
             pager.table("مشخصات پل",profile,true);
             pager.table("چک‌لیست، امتیازها و ارزیابی وضعیت",checklist,false);
             pager.finish();
             try(FileOutputStream stream=new FileOutputStream(out)){document.writeTo(stream);stream.getFD().sync();}
-        }
+        }finally{document.close();}
     }
     private static final class Pager {
         final PdfDocument document;final JSONObject meta;final Typeface font;final TextPaint body,heading;final Paint box=new Paint(Paint.ANTI_ALIAS_FLAG);

@@ -34,6 +34,7 @@ adb install --no-streaming -r "$APP_APK"
 wait_for_android_runtime
 adb install --no-streaming -r "$TEST_APK"
 
+trap 'adb pull /sdcard/Android/data/ir.bridge.maintenance/files/QA160 qa-artifacts >/dev/null 2>&1 || true' EXIT
 set +e
 adb shell am instrument -w ir.bridge.maintenance.test/androidx.test.runner.AndroidJUnitRunner > instrumentation.log 2>&1
 status=$?

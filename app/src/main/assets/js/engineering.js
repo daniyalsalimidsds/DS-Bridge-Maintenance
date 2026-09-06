@@ -9,7 +9,7 @@
     ['Caltrans — Bridge Element Inspection Manual','https://dot.ca.gov/-/media/dot-media/programs/maintenance/documents/f0009170-elem-man-a11y.pdf'],
     ['FHWA — Bridge Preservation Guide','https://www.fhwa.dot.gov/bridge/preservation/guide/guide.pdf'],
     ['AASHTOWare — بازرسی میدانی موبایل','https://www.aashtoware.org/products/bridge/bridge-mobile-inspection/'],
-    ['Bentley — AssetWise Inspections','https://www.bentley.com/en/products/assetwise-inspections/'],
+    ['Bentley — AssetWise Inspections','https://docs.bentley.com/LiveContent/web/AssetWise%20Inspections-vlatest/Help/en/topics/3091755/GUID-8DDBF8CC-C169-4935-B31E-B0168E2D7EA6.html'],
     ['FRA — ضوابط ایمنی پل راه‌آهن، 49 CFR Part 237','https://www.ecfr.gov/current/title-49/subtitle-B/chapter-II/part-237'],
   ];
   const LESSONS=[
@@ -105,7 +105,7 @@
       '<p class="muted">نمره‌ها را پس از مشاهده و با دلیل ثبت کنید. بدون اطلاعات کافی، «ارزیابی نشده» را نگه دارید.</p>'+
       S.COMPONENTS.map(c=>'<details class="component-rating"><summary><span>'+esc(c.name)+'</span><b dir="ltr">'+c.code+'</b></summary><div class="component-body"><p>'+esc(c.hint)+'</p><label class="field">نمره وضعیت<select data-component-rating="'+c.id+'"><option value="U">ارزیابی نشده / اطلاعات ناکافی</option><option value="N">N — این جزء وجود ندارد</option>'+[...S.RATINGS].reverse().map(r=>'<option value="'+r[0]+'">'+faNum(r[0])+' — '+esc(r[1])+'</option>').join('')+'</select></label><p data-rating-help="'+c.id+'" class="callout"></p><label class="field">شواهد، گستره و دلیل نمره<textarea rows="3" data-component-note="'+c.id+'">'+esc(values[c.id]?.note||'')+'</textarea></label></div></details>').join('');
     el('internationalMode').value=state.mode || 'bridge';
-    host.querySelectorAll('[data-component-rating]').forEach(control=>{control.value=values[control.dataset.componentRating]?.rating || 'U';updateRatingHelp(control);});
+    host.querySelectorAll('[data-component-rating]').forEach(control=>{control.value=String(values[control.dataset.componentRating]?.rating ?? 'U');updateRatingHelp(control);});
     renderElements();
   }
   function updateRatingHelp(control) {
