@@ -1,0 +1,29 @@
+name: گزارش اشکال
+description: مشکل نرم‌افزار را با مراحل بازتولید ثبت کنید.
+title: "[Bug] "
+body:
+  - type: input
+    id: version
+    attributes:
+      label: نسخه برنامه و نسخه Android
+      placeholder: "1.6.0 / Android 11 / مدل گوشی"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: مراحل بازتولید با داده آزمایشی
+      description: مسیر صفحه و انتخاب‌ها را به ترتیب بنویسید.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: نتیجه مورد انتظار و نتیجه مشاهده‌شده
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: تصویر یا جزئیات تکمیلی
+      description: اطلاعات واقعی پل، GPS حساس، امضای اشخاص و کلید/رمز را پیوست نکنید.

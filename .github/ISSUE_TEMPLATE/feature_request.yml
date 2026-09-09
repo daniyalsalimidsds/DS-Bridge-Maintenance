@@ -1,0 +1,22 @@
+name: پیشنهاد قابلیت
+description: نیاز عملیاتی یا پیشنهاد اصلاح را توضیح دهید.
+title: "[Feature] "
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: نیاز بازرس یا سرپرست
+      description: مسئله فعلی و نتیجه‌ای را که می‌خواهید توضیح دهید.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: رفتار پیشنهادی و معیار پذیرش
+    validations:
+      required: true
+  - type: textarea
+    id: reference
+    attributes:
+      label: مرجع فنی یا نمونه
+      description: برای تغییر امتیاز یا طبقه‌بندی، منبع، نسخه و شماره بند را بنویسید.

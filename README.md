@@ -2,6 +2,31 @@
 
 برنامه آفلاین فارسی برای شناسنامه پل، بازرسی چشمی، مستندسازی آسیب، پیگیری تعمیر و گزارش‌گیری. شناسه برنامه `ir.bridge.maintenance`، کد نسخه `10600` و حداقل اندروید ۸ (`API 26`) است.
 
+## دریافت و نصب
+
+[دانلود آخرین نسخهٔ منتشرشده](https://github.com/daniyalsalimidsds/DS-Bridge-Maintenance/releases/latest) · [Release نسخهٔ v1.6.0](https://github.com/daniyalsalimidsds/DS-Bridge-Maintenance/releases/tag/v1.6.0)
+
+| فایل | کاربرد |
+|---|---|
+| [APK امضاشده](https://github.com/daniyalsalimidsds/DS-Bridge-Maintenance/releases/download/v1.6.0/Bridge_Maintenance_v1.6.0.apk) | نصب یا ارتقای مستقیم روی گوشی |
+| [بستهٔ کامل نصب](https://github.com/daniyalsalimidsds/DS-Bridge-Maintenance/releases/download/v1.6.0/Bridge_Maintenance_v1.6.0_INSTALL.zip) | APK، راهنمای فارسی، نمونه PDF/Excel/CSV و تصاویر آزمون |
+| [سورس کامل نسخه](https://github.com/daniyalsalimidsds/DS-Bridge-Maintenance/releases/download/v1.6.0/Bridge_Maintenance_v1.6.0_Source.zip) | سورس، Gradle Wrapper، آزمون‌ها، داده مرجع و مستندات |
+| [SHA256SUMS](https://github.com/daniyalsalimidsds/DS-Bridge-Maintenance/releases/download/v1.6.0/SHA256SUMS.txt) | کنترل صحت فایل‌های دریافت‌شده |
+
+نسخهٔ امضاشده و بستهٔ نصب در [پوشهٔ انتشار مخزن](releases/v1.6.0/) نیز نگهداری می‌شوند. پیش از ارتقا، از داخل برنامه **پشتیبان کامل ZIP** بگیرید؛ نسخهٔ قبلی را حذف نکنید. Android 8 یا بالاتر و WebView سازگار لازم است. [راهنمای ارتقا](releases/v1.6.0/README.md) مراحل و کنترل پس از نصب را توضیح می‌دهد.
+
+مخزن در حال حاضر خصوصی است؛ دسترسی به فایل‌های Release نیز به حساب مجاز GitHub نیاز دارد.
+
+## نمای برنامه
+
+تصاویر زیر از اجرای واقعی روی شبیه‌ساز و با دادهٔ آزمایشی ثبت شده‌اند.
+
+<p>
+  <img src="docs/screenshots/checklist-five-statuses.png" width="260" alt="چک‌لیست فارسی با پنج وضعیت و عنوان چندخطی">
+  <img src="docs/screenshots/score-preview.png" width="260" alt="نمره منفی، پوشش مشاهده و ارزیابی مستقل">
+  <img src="docs/screenshots/academy-night-large.png" width="260" alt="راهنمای میدانی در حالت شب و متن بزرگ">
+</p>
+
 ## تغییرات اصلی ۱.۶.۰
 
 - پنج وضعیت «ندارد، کم، متوسط، اضطراری، ع.ا.ب» با تأیید صریح بررسی؛ گزینه انتخاب‌نشده سالم محسوب نمی‌شود.
@@ -36,3 +61,38 @@ bash tools/run_direct_instrumentation.sh
 دستور آخر به دستگاه یا شبیه‌ساز اندروید نیاز دارد. workflow **Bridge Maintenance Build and QA** آزمون‌های کد، ساخت release و آزمون‌های شبیه‌ساز را اجرا می‌کند؛ تصاویر آزمون رابط و نمونه خروجی فارسی در artifact آزمون اندروید قرار می‌گیرند. نتیجه هر commit باید از همان اجرای CI بررسی شود.
 
 کلید امضا و رمزها در مخزن نیستند. نصب به‌صورت به‌روزرسانی نسخه ۱.۵.۰ به همان گواهی امضای قبلی نیاز دارد. روش ساخت و امضا در [راهنمای تحویل](docs/BUILD_AND_RELEASE.md) آمده است.
+
+## وضعیت اعتبارسنجی نسخهٔ تحویلی
+
+| کنترل | نتیجهٔ ثبت‌شده |
+|---|---|
+| آزمون‌های JavaScript | ۲۳ ورودی آزمون موفق |
+| آزمون‌های واحد Java | ۶ آزمون موفق |
+| آزمون‌های اندروید | ۲۵ آزمون موفق روی Android 11 / API 30، Pixel 2 |
+| ساخت release و هویت بسته | موفق؛ نسخه ۱.۶.۰ و کد ۱۰۶۰۰ |
+| Android Lint | بدون Error/Fatal؛ ۳۸ Warning در گزارش موجود است |
+| امضای APK | v2 و v3 معتبر؛ همان گواهی نسخهٔ ۱.۵.۰ ارسالی |
+
+[اجرای آزمون نسخهٔ تحویلی](https://github.com/daniyalsalimidsds/DS-Bridge-Maintenance/actions/runs/34063041622) · [شناسنامهٔ کنترل](releases/v1.6.0/RELEASE_VERIFICATION.json) · [گزارش پذیرش](docs/RELEASE_QA.md) · [اجراهای خودکار مخزن](https://github.com/daniyalsalimidsds/DS-Bridge-Maintenance/actions)
+
+APK تحویلی از کد `080656b25b5efa971541d966acc792693f4ee187` ساخته شده است. تغییرهای تکمیل مخزن مربوط به مستندات و انتشارند؛ فهرست SHA-256 فایل‌های برنامه، تطابق آن‌ها با همین نسخه را هنگام انتشار کنترل می‌کند. آزمون گوشی واقعی، GPS و دوربین میدانی هنوز انجام نشده است.
+
+## ساختار مخزن
+
+| مسیر | محتوا |
+|---|---|
+| `app/src/main/java/` | کد بومی Android، SQLite، رسانه، موقعیت و گزارش |
+| `app/src/main/assets/` | رابط فارسی، چک‌لیست، محاسبات، فونت و راهنمای میدانی |
+| `app/src/androidTest/` و `app/src/test/` | آزمون‌های اندروید و Java |
+| `tests/` | آزمون‌های JavaScript و داده‌های سازگاری نسخه‌های قبلی |
+| `reference/` | شناسنامه مرجع، کاتالوگ استخراج‌شده و ممیزی ضرایب |
+| `docs/` | معماری، مبانی علمی، ساخت، امنیت، تغییرات و تصاویر برنامه |
+| `tools/` | تولید داده، کنترل سورس، آزمون دستگاه و انتشار نسخه |
+| `releases/v1.6.0/` | فایل‌های امضاشده، راهنمای نصب، نتایج کنترل و یادداشت انتشار |
+| `.github/workflows/` | ساخت و آزمون Android و انتشار فایل‌های تأییدشده |
+
+## توسعه و حقوق اجزای همراه
+
+[راهنمای مشارکت](CONTRIBUTING.md) · [امنیت و گزارش مشکل](SECURITY.md) · [مجوز وابستگی‌ها](docs/DEPENDENCY_LICENSES.md) · [منشأ و مجوز دارایی‌ها](docs/THIRD_PARTY_ASSETS.md)
+
+توسعه‌دهنده: **دانیال سلیمی — Daniyal Salimi**. مجوز متن‌باز مستقلی برای کل برنامه تعیین نشده است؛ مجوز فونت‌ها و کتابخانه‌های همراه در فایل‌های مربوط به همان اجزا ثبت شده‌اند.

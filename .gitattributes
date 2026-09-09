@@ -1,0 +1,10 @@
+# Downloadable source archives contain source, tests and documentation.
+# Signed binaries remain in Git and in the versioned GitHub Release.
+releases/**/*.apk export-ignore
+releases/**/*.zip export-ignore
+*.apk binary
+*.zip binary
+*.ttf binary
+*.png binary
+*.jpg binary
+*.xlsx binary

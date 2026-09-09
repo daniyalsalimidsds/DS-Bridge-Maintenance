@@ -1,0 +1,62 @@
+name: Publish verified Bridge 1.6.0
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'releases/v1.6.0/**'
+      - 'tools/publish_release.py'
+      - '.github/workflows/publish-release.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: bridge-publish-v1.6.0
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      actions: read
+      statuses: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Report publication started
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --method POST \
+            -f state=pending -f context=bridge-release-publication \
+            -f description='Checking and publishing the verified signed release' \
+            -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+      - name: Verify and publish the signed delivery
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tools/publish_release.py
+      - name: Save publication receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: Bridge_v1.6.0_Publication
+          path: release-publication/publication.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Report publication outcome
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRIDGE_JOB_STATUS: ${{ job.status }}
+        run: |
+          result=failure
+          if [ "$BRIDGE_JOB_STATUS" = success ]; then result=success; fi
+          gh api "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --method POST \
+            -f state="$result" -f context=bridge-release-publication \
+            -f description="Release publication: $result" \
+            -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
