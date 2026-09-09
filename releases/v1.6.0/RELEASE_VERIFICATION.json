@@ -1,0 +1,78 @@
+{
+  "product": "DS Bridge Maintenance",
+  "version_name": "1.6.0",
+  "version_code": 10600,
+  "application_id": "ir.bridge.maintenance",
+  "minimum_android_api": 26,
+  "target_android_api": 35,
+  "built_utc_date": "2026-09-06",
+  "source_commit": "080656b25b5efa971541d966acc792693f4ee187",
+  "source_url": "https://github.com/daniyalsalimidsds/DS-Bridge-Maintenance/tree/080656b25b5efa971541d966acc792693f4ee187",
+  "pull_request_url": "https://github.com/daniyalsalimidsds/DS-Bridge-Maintenance/pull/1",
+  "ci_url": "https://github.com/daniyalsalimidsds/DS-Bridge-Maintenance/actions/runs/34063041622",
+  "verification": {
+    "javascript_test_entries_passed": 23,
+    "java_unit_tests_passed": 6,
+    "android_instrumentation_tests_passed": 25,
+    "android_instrumentation_duration_seconds": 167.469,
+    "android_emulator": "API 30 / Android 11, Pixel 2, x86_64",
+    "release_build": "PASS",
+    "source_invariants": "PASS",
+    "lint_errors": 0,
+    "lint_warnings": 38,
+    "apk_alignment": "PASS",
+    "signature_v2": true,
+    "signature_v3": true,
+    "same_certificate_as_supplied_v150_apk": true,
+    "source_files_compared": 106,
+    "source_comparison_notes": "Build logs excluded; gradlew.bat line endings normalized. All 30 application assets inside APK match the tested workspace source.",
+    "source_asset_files_compared": 30,
+    "visual_checks": [
+      "Persian multiline checklist titles",
+      "Five severity statuses",
+      "Score refresh after navigation",
+      "Light theme handbook",
+      "Night theme and larger text",
+      "Eight-page PDF: negative sign, GPS ordering, long-text continuation, final total row"
+    ],
+    "xlsx_checks": [
+      "Native XML assertions for numeric total and continuation",
+      "Read-only import and rendered preview of the equivalent report from prior passing build; exporter unchanged",
+      "Right-to-left sheet XML setting; row height ceiling respected"
+    ],
+    "physical_device_tested": false,
+    "live_gps_and_camera_tested": false,
+    "android_lint_warning_note": "Warnings remain for guarded WebView/exact-alarm APIs and platform/accessibility advisories; no Error/Fatal findings."
+  },
+  "scoring": {
+    "source_workbook": "VELAYAT.xlsx",
+    "source_workbook_sha256": "65371aa90e804f1dc8f71e4027c73b01628035a8583eeea8ba99c02233efb319",
+    "source_titled_rows": 79,
+    "checklist_items": 497,
+    "added_items": 32,
+    "exact_equivalent_renames": 14,
+    "reference_sample_total": -240,
+    "supplemental_weights": "Proposed; organization approval required for formal use",
+    "international_framework": "Independent FHWA/SNBI March 2022 component assessment and quantity distributions, not a universal bridge health index"
+  },
+  "signed_apk": {
+    "apk_sha256": "18896e2b5b1e7a50e110cc953170d58d18076538e59e9c04bb758c551522e1e4",
+    "certificate_sha256": "19869b24c62aa922e9570337c3033e5c4cff0734d87816b69f9636dfa0e773b6",
+    "size_bytes": 1272684
+  },
+  "artifact_archives": {
+    "build": {
+      "github_artifact_id": 9998108460,
+      "sha256": "066d730e7d6e97303e6f35ed811436cd391a10d8f1a9ab976b9ff01f7ef5dc1e"
+    },
+    "build_logs": {
+      "github_artifact_id": 9998108711,
+      "sha256": "6c18ab159104b49898d5a90f08d17a6d5d6e4f3b70ce5b4d9bdb3cba02738cc6"
+    },
+    "instrumentation": {
+      "github_artifact_id": 9998165325,
+      "sha256": "ce276c489e748d76cd5d1c13a979396faddb3e2906f13d01c85f76621aadddfb"
+    }
+  },
+  "sample_data": "Synthetic QA observations; no real bridge record or signing key is included."
+}

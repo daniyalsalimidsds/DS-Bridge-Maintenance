@@ -1,0 +1,143 @@
+name: Bridge Maintenance Build and QA
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: bridge-maintenance-main
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Install Android SDK components
+        run: yes | sdkmanager "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+      - name: Validate schema, JavaScript and source invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test tests/js/*.test.js
+          for file in app/src/main/assets/js/*.js app/src/main/assets/data/*.js; do node --check "$file"; done
+          python3 tools/check_bridge_source.py
+      - name: Build and test Android project
+        shell: bash
+        run: |
+          set -o pipefail
+          chmod +x gradlew
+          ./gradlew --no-daemon clean testDebugUnitTest lintRelease assembleDebugAndroidTest assembleRelease 2>&1 | tee gradle-build.log
+      - name: Verify package identity and create source artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=app/build/outputs/apk/release/app-release-unsigned.apk
+          test -s "$APK"
+          BADGING="$($ANDROID_HOME/build-tools/35.0.0/aapt dump badging "$APK" | head -1)"
+          echo "$BADGING" | tee apk-identity.log
+          echo "$BADGING" | grep "name='ir.bridge.maintenance'"
+          echo "$BADGING" | grep "versionCode='10600'"
+          echo "$BADGING" | grep "versionName='1.6.0'"
+          mkdir -p release-artifacts
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -p -f 4 "$APK" release-artifacts/Bridge_Maintenance_v1.6.0_Unsigned.apk
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -p 4 release-artifacts/Bridge_Maintenance_v1.6.0_Unsigned.apk
+          cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" release-artifacts/apksigner.jar
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile, ZIP_DEFLATED
+          root=Path('.').resolve(); out=root/'release-artifacts'/'Bridge_Maintenance_v1.6.0_Tested_Source.zip'
+          banned_ext={'.jks','.keystore','.p12','.pfx'}
+          banned_names={'keystore.properties','signing.properties','local.properties'}
+          skip={'.git','.gradle','.idea','release-artifacts','build'}
+          with ZipFile(out,'w',ZIP_DEFLATED,compresslevel=6) as archive:
+              for path in sorted(root.rglob('*')):
+                  if not path.is_file(): continue
+                  rel=path.relative_to(root)
+                  if any(part in skip or part=='build' for part in rel.parts): continue
+                  if path.suffix.lower() in banned_ext or path.name.lower() in banned_names: continue
+                  archive.write(path,rel.as_posix())
+          PY
+          (cd release-artifacts && sha256sum Bridge_Maintenance_v1.6.0_Unsigned.apk Bridge_Maintenance_v1.6.0_Tested_Source.zip apksigner.jar > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Bridge_Maintenance_v1.6.0_Build
+          path: release-artifacts/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Bridge_Maintenance_v1.6.0_Logs
+          path: |
+            gradle-build.log
+            apk-identity.log
+            app/build/reports/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  instrumented-tests:
+    name: Android emulator tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Install build SDK
+        run: yes | sdkmanager "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+      - name: Enable KVM acceleration
+        shell: bash
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Build instrumentation APKs before starting the emulator
+        shell: bash
+        run: |
+          set -o pipefail
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDebug assembleDebugAndroidTest 2>&1 | tee instrumentation-build.log
+      - name: Run on Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          arch: x86_64
+          profile: pixel_2
+          cores: 2
+          ram-size: 3072M
+          heap-size: 512M
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot
+          script: bash tools/run_direct_instrumentation.sh
+      - name: Upload emulator diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Bridge_Maintenance_v1.6.0_Instrumentation_Logs
+          path: |
+            instrumentation-build.log
+            instrumentation.log
+            qa-artifacts/
+            app/build/reports/androidTests/
+          if-no-files-found: ignore
+          retention-days: 14

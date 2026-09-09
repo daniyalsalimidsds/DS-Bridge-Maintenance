@@ -1,0 +1,99 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'ir.bridge.maintenance'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'ir.bridge.maintenance'
+        minSdk 26
+        targetSdk 35
+        versionCode 10600
+        versionName '1.6.0'
+        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+        vectorDrawables.useSupportLibrary = true
+        buildConfigField 'String', 'APP_ORIGIN', '"https://appassets.androidplatform.net"'
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    buildTypes {
+        debug {
+            applicationIdSuffix ''
+            versionNameSuffix '-debug'
+        }
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            // Signing is intentionally external. Do not commit credentials or private keys.
+            def signingProps = ['BRIDGE_STORE_FILE', 'BRIDGE_STORE_PASSWORD', 'BRIDGE_KEY_ALIAS', 'BRIDGE_KEY_PASSWORD']
+            def signingReady = signingProps.every { project.hasProperty(it) && project.property(it).toString().trim() }
+            if (signingReady) {
+                signingConfig signingConfigs.create('externalRelease') {
+                    storeFile file(project.property('BRIDGE_STORE_FILE'))
+                    storePassword project.property('BRIDGE_STORE_PASSWORD')
+                    keyAlias project.property('BRIDGE_KEY_ALIAS')
+                    keyPassword project.property('BRIDGE_KEY_PASSWORD')
+                }
+                signingConfig signingConfigs.externalRelease
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    packaging {
+        resources.excludes += ['META-INF/DEPENDENCIES', 'META-INF/LICENSE*', 'META-INF/NOTICE*']
+    }
+}
+
+// Kotlin 1.8+ folds the JDK7/JDK8 extension artifacts into kotlin-stdlib.
+// Some AndroidX transitive paths still request the legacy split artifacts;
+// exclude them to prevent duplicate classes in release packaging.
+configurations.configureEach {
+    exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'
+    exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
+}
+
+dependencies {
+    implementation 'androidx.activity:activity:1.9.3'
+    implementation 'androidx.core:core:1.15.0'
+    implementation 'androidx.webkit:webkit:1.12.1'
+    implementation 'androidx.exifinterface:exifinterface:1.3.7'
+
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test:core:1.6.1'
+    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
+    androidTestImplementation 'androidx.test:runner:1.6.2'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.6.1'
+    androidTestImplementation 'androidx.test.uiautomator:uiautomator:2.3.0'
+}
+
+def requiredGeneratedAssets = [
+    file('src/main/assets/fonts/NotoSansArabic.ttf'),
+    file('src/main/assets/fonts/Vazirmatn.ttf'),
+    file('src/main/assets/fonts/NotoNaskhArabic.ttf'),
+    file('src/main/assets/data/bridge-profile-schema.js'),
+    file('src/main/assets/data/bridge-checklists.js'),
+    file('../reference/شناسنامه_فنی_پل_نشریه_367.xlsx')
+]
+
+tasks.register('verifyGeneratedBuildAssets') {
+    doLast {
+        def missing = requiredGeneratedAssets.findAll { !it.isFile() }
+        if (!missing.isEmpty()) {
+            throw new GradleException('Missing bridge schema/checklist/reference assets. Run the bridge schema generator before building.')
+        }
+    }
+}
+tasks.configureEach { task ->
+    if (task.name == 'preBuild') task.dependsOn('verifyGeneratedBuildAssets')
+}

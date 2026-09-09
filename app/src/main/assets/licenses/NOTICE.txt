@@ -1,0 +1,6 @@
+Bridge Maintenance includes AndroidX Activity, Core, WebKit and ExifInterface, and their runtime dependencies.
+Copyright The Android Open Source Project. Licensed under Apache License, Version 2.0; see APACHE-2.0.txt.
+Kotlin standard library: Copyright JetBrains s.r.o. and Kotlin Programming Language contributors. Apache License, Version 2.0.
+Persian and Arabic font copyright notices and the SIL Open Font License are in FONT_LICENSES.txt.
+
+Application code and project identity: Daniyal Salimi. No open-source license is granted for the application by these third-party notices.

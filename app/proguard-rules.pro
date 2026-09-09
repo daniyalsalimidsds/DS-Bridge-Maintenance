@@ -1,0 +1,2 @@
+-keep class ir.bridge.maintenance.** { *; }
+-dontwarn org.chromium.**
