@@ -1,6 +1,7 @@
 'use strict';
 
-const ENTITY_KINDS = ['users', 'bridges', 'standards', 'inspections', 'defects', 'audit', 'settings', 'reminders'];
+const ENTITY_KINDS = ['users', 'bridges', 'standards', 'inspections', 'defects', 'audit', 'settings', 'reminders',
+  'reviews', 'criticalFindings', 'inspectionVoids', 'reportRevisions', 'inspectionPrograms'];
 window.ENTITY_KINDS = ENTITY_KINDS;
 
 const pageNames = {
@@ -8,10 +9,13 @@ const pageNames = {
   bridges: 'لیست پل‌ها',
   bridgeForm: 'شناسنامه فنی پل',
   inspectionForm: 'ثبت بازدید',
-  drafts: 'پیش‌نویس‌ها', inspections: 'بازدیدهای ثبت‌شده',
+  drafts: 'پیش‌نویس‌ها و بازگشتی‌ها', inspections: 'گزارش‌های رسمی',
+  reviews: 'صف کنترل کیفیت مستقل',
+  criticalFindings: 'یافته‌های بحرانی',
+  programs: 'برنامه بازرسی و موعدها',
   defects: 'آسیب‌ها و اقدامات اصلاحی',
   reports: 'گزارش‌ها',
-  users: 'کاربران و نقش‌ها',
+  users: 'هویت‌ها، نقش‌ها و صلاحیت‌ها',
   master: 'منابع و حدود فنی',
   settings: 'تنظیمات',
   guide: 'راهنمای استفاده',
@@ -60,6 +64,7 @@ window.esc = esc;
 window.toast = toast;
 
 function getActiveUser() {
+  if (window.Governance?.initialized) return window.Governance.currentUser();
   const settings = dbList('settings').find(item => item.id === 'main') || {};
   const users = dbList('users');
   return users.find(user => user.id === settings.activeUser) || users.find(user => user.active) || users[0] || null;
@@ -67,9 +72,9 @@ function getActiveUser() {
 
 function audit(action, kind, entityId, detail = '') {
   const user = getActiveUser();
-  dbSave('audit', {
-    id: id('aud'), user: user?.name || 'سیستم', action, kind, eid: entityId, detail, at: Date.now(),
-  });
+  if (!user) return Promise.resolve({ ok: false, error: 'authentication-required' });
+  if (Native?.appendAudit) return Native.appendAudit({ action, kind, entityId, detail, reason: detail });
+  return Promise.resolve({ ok: false, error: 'audit-service-unavailable' });
 }
 
 window.getActiveUser = getActiveUser;
@@ -379,17 +384,21 @@ function blankInspection(bridgeId = '') {
   return {
     id: id('ins'), status: 'پیش‌نویس', bridgeId: bridge?.id || '', bridgeName: bridge ? bridgeName(bridge) : '',
     bridgeCode: bridge ? bridgeCode(bridge) : '', bridgeSnapshot: bridge ? JSON.parse(JSON.stringify(bridge)) : null,
-    checklistSchemaVersion: '1.6.0', items: [], itemPhotos: {}, itemLocations: {},
+    workflowStatus: 'draft', checklistSchemaVersion: '1.7.0', items: [], itemPhotos: {}, itemLocations: {},
   };
 }
 
 function resetInspectionControls() {
   if ($('visitType')) $('visitType').selectedIndex = 0;
   if ($('shift')) $('shift').selectedIndex = 0;
-  if ($('inspectorName')) $('inspectorName').value = '';
+  if ($('inspectorName')) {
+    $('inspectorName').value = getActiveUser()?.name || '';
+    $('inspectorName').readOnly = true;
+  }
 }
 
 function newInspection(bridgeId = '') {
+  if (window.Governance?.initialized && !window.Governance.requireSession('برای شروع بازدید وارد شوید.')) return;
   window.flushInspectionAutosave?.();
   const bridges = dbList('bridges').filter(item => !item.archived);
   if (!bridges.length) {
@@ -667,17 +676,16 @@ function inspectionFormValues() {
   };
 }
 
-function saveInspection(finalize) {
-  if (!currentInspection || currentInspection.status==='نهایی') return;
-  if (finalize && window.pendingFinalization) { toast('نهایی‌سازی در حال انجام است.'); return; }
+async function saveInspection(submitForQc) {
+  if (!currentInspection || ['submitted', 'approved'].includes(currentInspection.workflowStatus)) return;
+  if (submitForQc && window.pendingFinalization) { toast('ارسال برای کنترل کیفیت در حال انجام است.'); return; }
+  if (submitForQc && window.Governance?.initialized && !window.Governance.requireSession('برای ارسال بازدید وارد شوید.')) return;
   const bridge = window.selectedInspectionBridge?.();
   if (!bridge) { toast('ابتدا پل مورد بازدید را انتخاب کنید.'); $('inspectionBridge')?.focus(); return; }
   const items = collectItems();
   window.captureEngineeringAssessment?.();
-  if(finalize && !window.validateEngineeringFinalization?.(items)) return;
-  if (!finalize && !checklistHasEnteredData(items) && !currentInspection.signatureAttachment && !currentInspection.internationalAssessment?.reviewer && !currentInspection.elementAssessments?.length) {
-    // Do not leave an empty draft behind. This also cleans an older draft if a
-    // user removed every checklist value and then pressed «ذخیره پیش‌نویس».
+  if (submitForQc && !window.validateEngineeringFinalization?.(items)) return;
+  if (!submitForQc && !checklistHasEnteredData(items) && !currentInspection.signatureAttachment && !currentInspection.internationalAssessment?.reviewer && !currentInspection.elementAssessments?.length) {
     const alreadySaved = dbList('inspections').some(item => item.id === currentInspection.id && item.status === 'پیش‌نویس');
     if (alreadySaved) {
       dbDeleteBatch(inspectionDeleteEntries(currentInspection.id)).then(result => {
@@ -688,27 +696,36 @@ function saveInspection(finalize) {
     toast('چک‌لیست هنوز ورودی ندارد؛ پیش‌نویسی ذخیره نشد.');
     return;
   }
-  const overallResult=inspectionOverall(items);
-  const overall=overallResult.id;
-  const values = inspectionFormValues();
-  if (finalize && !values.inspector) {
-    toast('نام بازرس را وارد کنید.');
-    $('inspectorName')?.focus();
-    return;
-  }
-  if (finalize && !currentInspection.signatureAttachment?.mediaId) {
-    toast('برای ثبت نهایی، امضای بازرس الزامی است.');
-    return;
-  }
-  if (finalize && String(currentInspection.signatureAttachment?.signer || '').trim() !== values.inspector) {
-    toast('نام بازرس پس از ثبت امضا تغییر کرده است؛ امضا را دوباره ثبت کنید.');
-    return;
-  }
+  const overallResult = inspectionOverall(items);
+  const overall = overallResult.id;
   const user = getActiveUser();
+  if (submitForQc && !user) { toast('نشست احراز هویت فعال نیست.'); window.Governance?.openAuthentication(); return; }
+  let inspectorReassignmentReason = '';
+  if (submitForQc && currentInspection.inspectorId && currentInspection.inspectorId !== user?.id) {
+    inspectorReassignmentReason = await window.Governance?.collectInspectorReassignment(currentInspection, user);
+    if (!inspectorReassignmentReason) return;
+  }
+  const values = inspectionFormValues();
+  values.inspector = user?.name || values.inspector;
+  if (submitForQc && overall === 'unknown') {
+    toast('حداقل یک مقدار شدت ناشناخته است؛ پیش از ارسال آن را بازبینی کنید.');
+    return;
+  }
+  if (submitForQc && !currentInspection.signatureAttachment?.mediaId) {
+    toast('برای ارسال رسمی، امضای بازرس احراز‌شده الزامی است.');
+    return;
+  }
+  if (submitForQc && currentInspection.signatureAttachment?.signerId !== user?.id) {
+    toast('امضا به هویت نشست فعلی متصل نیست؛ امضا را دوباره ثبت کنید.');
+    return;
+  }
   const now = Date.now();
+  const priorWorkflow = currentInspection.workflowStatus || 'draft';
+  const draftInspectorId = priorWorkflow === 'returned' ? currentInspection.inspectorId : (user?.id || currentInspection.inspectorId || '');
+  const draftInspectorName = priorWorkflow === 'returned' ? currentInspection.inspector : (user?.name || values.inspector);
   const inspection = {
     ...currentInspection,
-    no: currentInspection.no || `B-${currentJCompact()}-${String(dbList('inspections').length + 1).padStart(3, '0')}`,
+    draftReference: currentInspection.draftReference || ('D-' + currentInspection.id.slice(-12).toUpperCase()),
     jdate: jfmt(selectedJ),
     gdate: $('gdate')?.value || '',
     bridgeId: bridge.id,
@@ -717,36 +734,41 @@ function saveInspection(finalize) {
     bridgeUse: bridgeUse(bridge),
     bridgeLocation: bridge.location ? { ...bridge.location } : null,
     bridgeSnapshot: JSON.parse(JSON.stringify(bridge)),
-    checklistSchemaVersion: '1.6.0',
+    checklistSchemaVersion: '1.7.0',
     ...values,
     items,
     overall,
     overallLabel: overallResult.label,
     photos: currentPhotos,
-    inspector: values.inspector,
-    inspectorId: '',
-    createdByUserId: user?.id || '',
-    status: finalize ? 'نهایی' : 'پیش‌نویس',
-    finalizedAt: finalize ? now : null,
+    inspector: submitForQc ? (user?.name || values.inspector) : draftInspectorName,
+    inspectorId: submitForQc ? (user?.id || currentInspection.inspectorId || '') : draftInspectorId,
+    inspectorReassignmentReason,
+    createdByUserId: currentInspection.createdByUserId || user?.id || '',
+    status: submitForQc ? 'ارسال‌شده' : (priorWorkflow === 'returned' ? 'بازگشت برای اصلاح' : 'پیش‌نویس'),
+    workflowStatus: submitForQc ? 'submitted' : (priorWorkflow === 'returned' ? 'returned' : 'draft'),
+    officialReport: false,
+    finalizedAt: null,
     updatedAt: now,
   };
+  delete inspection.no;
+  delete inspection.reportNo;
   ['action', 'note', 'responsible', 'priority', 'deadline', 'nextInspection', 'restriction', 'restrictionNo', 'materials']
     .forEach(field => delete inspection[field]);
-  if (!finalize) {
+  if (!submitForQc) {
     dbSave('inspections', inspection);
     currentInspection = inspection;
     window.currentInspection = inspection;
-    audit('ذخیره پیش‌نویس', 'inspections', inspection.id, `${inspection.no} • ${inspection.bridgeName}`);
+    audit('inspection-draft-saved', 'inspections', inspection.id, inspection.draftReference + ' • ' + inspection.bridgeName);
     $('inspectionNo').textContent = 'پیش‌نویس ذخیره‌شده';
     toast('پیش‌نویس ذخیره شد.');
     return;
   }
-  inspection.scoringVersion='1.6.0';
-  inspection.scores=window.BridgeScoring?.snapshot(inspection);
-  const defects = items.filter(item => item.applicable!==false && (severityRank(item.statusId) > 0 || item.statusId==='uninspectable')).map(item => {
+  inspection.scoringVersion = window.BridgeScoring?.VERSION || '1.6.0';
+  inspection.scores = window.BridgeScoring?.snapshot(inspection);
+  const defects = items.filter(item => item.applicable !== false && (severityRank(item.statusId) > 0 || item.statusId === 'uninspectable')).map(item => {
     const occurrenceIndex = Number(item.occurrenceIndex) || 1;
     const existing = dbList('defects').find(defect => defect.inspectionId === inspection.id && defect.itemId === item.itemId && (Number(defect.occurrenceIndex) || 1) === occurrenceIndex);
-    const gps = item.location && Number.isFinite(Number(item.location.lat)) ? `GPS ${Number(item.location.lat).toFixed(6)}, ${Number(item.location.lon).toFixed(6)}` : '';
+    const gps = item.location && Number.isFinite(Number(item.location.lat)) ? 'GPS ' + Number(item.location.lat).toFixed(6) + ', ' + Number(item.location.lon).toFixed(6) : '';
     return {
       ...(existing || {}),
       id: existing?.id || id('def'),
@@ -758,10 +780,10 @@ function saveInspection(finalize) {
       itemCode: item.itemCode,
       occurrenceIndex,
       code: item.code,
-      title: `${item.code} — ${itemName(item.itemId)}`,
+      title: item.code + ' — ' + itemName(item.itemId),
       location: [inspection.bridgeName, inspection.bridgeCode, gps].filter(Boolean).join(' • '),
       gpsLocation: item.location || null,
-      findingType:item.statusId==='uninspectable'?'inspection-gap':'damage',
+      findingType: item.statusId === 'uninspectable' ? 'inspection-gap' : 'damage',
       severityId: item.statusId,
       severity: severityLabel(item.statusId),
       workflow: existing?.workflow || 'باز',
@@ -772,36 +794,41 @@ function saveInspection(finalize) {
       updatedAt: now,
     };
   });
-  const reminders = window.reminderRecordsForInspection?.(inspection) || [];
-  const auditRecord = {
-    id: id('aud'), user: user?.name || 'سیستم', action: 'نهایی‌سازی بازدید', kind: 'inspections',
-    eid: inspection.id, detail: `${inspection.no} • ${inspection.bridgeName}`, at: now, updatedAt: now,
-  };
-  window.pendingFinalization = { inspection, defects, reminders, audit: auditRecord };
+  const criticalFindings = await window.Governance?.collectCriticalCases(items, inspection, defects);
+  if (criticalFindings == null) return;
+  window.pendingFinalization = { inspectionId: inspection.id };
   window.setFinalizationPending?.(true);
-  if (Native?.isNative?.()) {
-    if (!Native.finalizeInspection(inspection, defects, reminders, auditRecord)) window.receiveFinalizeResult?.({ ok: false });
-  } else {
-    dbSave('inspections', inspection);
-    defects.forEach(defect => dbSave('defects', defect));
-    reminders.forEach(reminder => dbSave('reminders', reminder));
-    dbSave('audit', auditRecord);
-    window.receiveFinalizeResult?.({ ok: true });
+  const result = await Native.submitInspection({ inspection, defects, criticalFindings });
+  window.setFinalizationPending?.(false);
+  window.pendingFinalization = null;
+  if (!result?.ok) {
+    toast(window.Governance?.errorMessage(result?.error) || 'ارسال انجام نشد؛ پیش‌نویس حفظ شد.');
+    return;
   }
+  const committed = dbList('inspections').find(item => item.id === inspection.id) || inspection;
+  currentInspection = committed;
+  window.currentInspection = committed;
+  document.dispatchEvent(new CustomEvent('bridge-inspection-submitted', { detail: { inspection: committed } }));
+  renderDashboard();
+  window.renderReviews?.();
+  go('reviews');
+  toast('بازدید قفل و برای کنترل کیفیت مستقل ارسال شد.');
 }
-
 function restoreInspectionControls(record) {
   ['visitType', 'shift'].forEach(elementId => {
     const element = $(elementId);
     if (element && record[elementId] && [...element.options].some(option => option.value === record[elementId])) element.value = record[elementId];
   });
-  if ($('inspectorName')) $('inspectorName').value = record.inspector || '';
+  if ($('inspectorName')) {
+    $('inspectorName').value = getActiveUser()?.name || record.inspector || '';
+    $('inspectorName').readOnly = true;
+  }
 }
 
 function editInspection(recordId) {
   window.flushInspectionAutosave?.();
   const record = dbList('inspections').find(item => item.id === recordId);
-  if (!record || record.status !== 'پیش‌نویس') { toast('فقط پیش‌نویس قابل ویرایش است.'); return; }
+  if (!record || !['draft', 'returned'].includes(record.workflowStatus || (record.status === 'پیش‌نویس' ? 'draft' : ''))) { toast('فقط پیش‌نویس یا گزارش بازگشتی قابل ویرایش است.'); return; }
   currentInspection = JSON.parse(JSON.stringify(record));
   currentPhotos = [...(record.photos || [])];
   window.currentInspection = currentInspection;
@@ -832,19 +859,19 @@ window.editInspection = editInspection;
 
 /* Lists and detail views */
 function recordCheckbox(scope, idValue) { return `<input class="record-check" type="checkbox" data-scope="${scope}" value="${esc(idValue)}" onclick="event.stopPropagation()" aria-label="انتخاب رکورد">`; }
-function recordDeleteButton(scope,idValue){return `<button class="btn danger compact-btn" type="button" onclick="event.stopPropagation();deleteSingleRecord('${esc(scope)}','${esc(idValue)}')" aria-label="حذف این مورد">حذف</button>`;}
+function recordDeleteButton(scope,idValue){if(['recent','inspections','drafts'].includes(scope)){const record=dbList('inspections').find(item=>item.id===idValue);if(record?.submittedAt||!['draft',''].includes(record?.workflowStatus||''))return '';}return `<button class="btn danger compact-btn" type="button" onclick="event.stopPropagation();deleteSingleRecord('${esc(scope)}','${esc(idValue)}')" aria-label="حذف این مورد">حذف</button>`;}
 
 function renderDashboard() {
   renderHeader();
   const inspections = dbList('inspections').filter(item => !item.archived);
   const defects = dbList('defects').filter(item => !item.archived);
   const open = defects.filter(item => !['رفع‌شده', 'تأیید نهایی'].includes(item.workflow));
-  const emergency = open.filter(item => severityId(item.severityId || item.severity) === 'emergency');
+  const emergency = dbList('criticalFindings').filter(item => item.status !== 'closed');
   $('stIns').textContent = faNum(inspections.length);
   $('stBridges').textContent = faNum(dbList('bridges').filter(item => !item.archived).length);
   $('stCritical').textContent = faNum(emergency.length);
   $('stResolved').textContent = faNum(defects.filter(item => ['رفع‌شده', 'تأیید نهایی'].includes(item.workflow)).length);
-  $('recentList').innerHTML = inspections.slice(0, 5).map(record => `<div class="listitem" onclick="${record.status==='پیش‌نویس'?`editInspection('${esc(record.id)}')`:`viewInspection('${esc(record.id)}')`}">${recordCheckbox('recent',record.id)}<div class="listmain"><b>${esc(record.no || 'پیش‌نویس')} — ${esc(record.bridgeName || 'پل نامشخص')}</b><small>${esc(record.jdate || '')} • ${esc(record.inspector || '')}</small></div><span class="severity-badge ${severityClass(record.overall)}">${esc(severityLabel(record.overall))}</span>${recordDeleteButton('recent',record.id)}</div>`).join('') || '<div class="empty">هنوز بازدیدی ثبت نشده است.</div>';
+  $('recentList').innerHTML = inspections.slice(0, 5).map(record => `<div class="listitem" onclick="${['draft','returned'].includes(record.workflowStatus || (record.status==='پیش‌نویس'?'draft':''))?`editInspection('${esc(record.id)}')`:`viewInspection('${esc(record.id)}')`}"><div class="listmain"><b>${esc(record.no || window.Governance?.workflowLabel(record) || 'پیش‌نویس')} — ${esc(record.bridgeName || 'پل نامشخص')}</b><small>${esc(record.jdate || '')} • ${esc(record.inspector || '')} • ${esc(window.Governance?.workflowLabel(record) || record.status || '')}</small></div><span class="severity-badge ${severityClass(record.overall)}">${esc(severityLabel(record.overall))}</span></div>`).join('') || '<div class="empty">هنوز بازدیدی ثبت نشده است.</div>';
 }
 
 function filteredInspectionRecords() {
@@ -853,14 +880,14 @@ function filteredInspectionRecords() {
 }
 
 function renderInspections() {
-  const records=filteredInspectionRecords().filter(record=>record.status==='نهایی');
-  $('inspectionList').innerHTML = records.map(record => `<div class="listitem" onclick="viewInspection('${esc(record.id)}')">${recordCheckbox('inspections',record.id)}<div class="listmain"><b>${esc(record.no || '')} — ${esc(record.bridgeName || 'پل نامشخص')}${record.bridgeCode ? ` • ${esc(record.bridgeCode)}` : ''}</b><small>${esc(record.jdate || '')} • ${esc(record.visitType || '')} • ${esc(record.inspector || '')}</small></div><span class="severity-badge ${severityClass(record.overall)}">${esc(severityLabel(record.overall))}</span>${recordDeleteButton('inspections',record.id)}</div>`).join('') || '<div class="empty">بازدید ثبت‌شده‌ای یافت نشد.</div>';
+  const records=filteredInspectionRecords().filter(record=>record.workflowStatus==='approved' || record.status==='نهایی');
+  $('inspectionList').innerHTML = records.map(record => {const voided=window.Governance?.isVoided(record.id);return `<div class="listitem" onclick="viewInspection('${esc(record.id)}')"><div class="listmain"><b>${esc(record.no || '')} — ${esc(record.bridgeName || 'پل نامشخص')}${record.bridgeCode ? ` • ${esc(record.bridgeCode)}` : ''}</b><small>${esc(record.jdate || '')} • ${esc(record.visitType || '')} • بازرس: ${esc(record.inspector || '')} • QC: ${esc(record.qcReviewer || 'میراثی/ثبت‌نشده')}</small></div><span class="pill ${voided?'danger':'green'}">${voided?'باطل‌شده':'تأییدشده'}</span><span class="severity-badge ${severityClass(record.overall)}">${esc(severityLabel(record.overall))}</span></div>`;}).join('') || '<div class="empty">گزارش رسمی یا سابقه باطل‌شده‌ای یافت نشد.</div>';
 }
 
 function renderDrafts(){
   const q=normalizeFaSearch($('draftSearch')?.value||'');
-  const records=dbList('inspections').filter(x=>!x.archived&&x.status==='پیش‌نویس').filter(x=>!q||normalizeFaSearch(JSON.stringify(x)).includes(q));
-  $('draftList').innerHTML=records.map(record=>`<div class="listitem" onclick="editInspection('${esc(record.id)}')">${recordCheckbox('drafts',record.id)}<div class="listmain"><b>${esc(record.no||'پیش‌نویس')} — ${esc(record.bridgeName||'پل نامشخص')}</b><small>${esc(record.jdate||'')} • ${esc(record.inspector||'')}</small></div><span class="pill blue">پیش‌نویس</span>${recordDeleteButton('drafts',record.id)}</div>`).join('')||'<div class="empty">پیش‌نویسی وجود ندارد.</div>';
+  const records=dbList('inspections').filter(x=>!x.archived&&['draft','returned'].includes(x.workflowStatus || (x.status==='پیش‌نویس'?'draft':''))).filter(x=>!q||normalizeFaSearch(JSON.stringify(x)).includes(q));
+  $('draftList').innerHTML=records.map(record=>`<div class="listitem" onclick="editInspection('${esc(record.id)}')">${record.workflowStatus==='draft'?recordCheckbox('drafts',record.id):''}<div class="listmain"><b>${esc(record.no||'پیش‌نویس')} — ${esc(record.bridgeName||'پل نامشخص')}</b><small>${esc(record.jdate||'')} • ${esc(record.inspector||'')}${record.qcComment?' • نظر QC: '+esc(record.qcComment):''}</small></div><span class="pill ${record.workflowStatus==='returned'?'warning':'blue'}">${record.workflowStatus==='returned'?'بازگشتی':'پیش‌نویس'}</span>${recordDeleteButton('drafts',record.id)}</div>`).join('')||'<div class="empty">پیش‌نویس یا گزارش بازگشتی وجود ندارد.</div>';
 }
 
 function selectAllRecords(scope){document.querySelectorAll(`.record-check[data-scope="${scope}"]`).forEach(x=>x.checked=true);}
@@ -914,22 +941,31 @@ function renderDefects() {
 function viewInspection(recordId) {
   const record = dbList('inspections').find(item => item.id === recordId);
   if (!record) return;
+  const editable = ['draft', 'returned'].includes(record.workflowStatus || (record.status === 'پیش‌نویس' ? 'draft' : ''));
+  const official = Boolean(window.isOfficialInspection?.(record));
   const damaged = (record.items || []).filter(item => item.applicable!==false && (severityRank(item.statusId || item.status) > 0 || severityId(item.statusId || item.status)==='uninspectable'));
   const bridgeLine = [record.bridgeName, record.bridgeCode, record.bridgeUse].filter(Boolean).map(esc).join(' • ');
   showGeneric('جزئیات بازدید', `<div class="rolebox"><b>${esc(record.no || '')}</b><div class="muted">${esc(record.jdate || '')} • ${bridgeLine} • ${esc(record.inspector || '')}</div></div>
+    <div class="workflow-banner"><b>${esc(window.Governance?.workflowLabel(record) || record.status || '')}</b><span>${official ? 'قابل صدور رسمی' : 'فاقد خروجی رسمی'}</span></div>
     ${window.engineeringSummaryHtml?.(record) || ''}
     ${damaged.map(item => `<div class="rolebox"><b>${esc(item.code || occurrenceCode(item.itemId, item.occurrenceIndex || 1))} — ${esc(item.itemName || itemName(item.itemId))}</b><span class="severity-badge ${severityClass(item.statusId || item.status)}">${esc(severityLabel(item.statusId || item.status))}</span><div class="muted">${[item.location && `GPS ${Number(item.location.lat).toFixed(6)}, ${Number(item.location.lon).toFixed(6)}`, item.note].filter(Boolean).map(esc).join(' • ')}</div></div>`).join('') || '<div class="muted">مورد آسیب‌دیده ثبت نشده است.</div>'}
     ${record.signatureAttachment?.url ? `<div class="rolebox signature-attachment"><b>امضای بازرس</b><div class="muted">${esc(record.signatureAttachment.signer || record.inspector || '')} • ${esc(record.signatureAttachment.visitDate || record.jdate || '')}</div><img loading="lazy" src="${esc(record.signatureAttachment.url)}" alt="امضای بازرس"></div>` : ''}`,
   [
-    { t: 'PDF این بازدید', c: 'primary', fn: `exportSingleInspection('${esc(record.id)}')` },
-    { t: 'ZIP کامل این بازدید', c: 'primary', fn: `exportSingleInspectionZip('${esc(record.id)}')` },
-    { t: record.status === 'پیش‌نویس' ? 'ویرایش' : 'حذف', fn: record.status === 'پیش‌نویس' ? `editInspection('${esc(record.id)}')` : `archiveInspection('${esc(record.id)}')` },
+    ...(official ? [
+      { t: 'PDF رسمی', c: 'primary', fn: `exportSingleInspection('${esc(record.id)}')` },
+      { t: 'ZIP کامل رسمی', c: 'primary', fn: `exportSingleInspectionZip('${esc(record.id)}')` },
+    ] : []),
+    { t: editable ? 'ویرایش' : 'مدیریت رکورد', fn: editable ? `editInspection('${esc(record.id)}')` : `openRecordGovernance('${esc(record.id)}')` },
   ]);
 }
 
 async function archiveInspection(recordId) {
   const record = dbList('inspections').find(item => item.id === recordId);
   if (!record) return;
+  if (record.submittedAt || !['draft', ''].includes(record.workflowStatus || '')) {
+    window.openRecordGovernance?.(recordId);
+    return;
+  }
   if (!confirm(`بازدید «${record.no || record.bridgeName || ''}» و آسیب‌های وابسته حذف شوند؟`)) return;
   const result = await deleteInspectionEntity(recordId);
   if (!result?.ok) { toast('حذف بازدید انجام نشد؛ داده‌ها حفظ شدند.'); return; }
@@ -1052,7 +1088,7 @@ function masterTab() {
 }
 
 function reportRecords() {
-  const records = dbList('inspections').filter(item => !item.archived && item.status === 'نهایی');
+  const records = dbList('inspections').filter(item => !item.archived && window.isOfficialInspection?.(item));
   if ($('reportPeriod').value === 'all') return records;
   const key = enNum(jfmt(reportJ));
   if ($('reportPeriod').value === 'day') return records.filter(item => enNum(item.jdate) === key);
@@ -1153,11 +1189,13 @@ function clearSignature() {
 function saveSignature() {
   if (!sigInk) { toast('ابتدا امضا کنید.'); return; }
   if (sigTarget !== 'inspector' || !currentInspection) { toast('بازدید فعالی برای ثبت امضا وجود ندارد.'); return; }
-  const signer = $('inspectorName')?.value.trim() || '';
-  if (!signer) { toast('ابتدا نام بازرس را وارد کنید.'); $('inspectorName')?.focus(); return; }
+  const user = getActiveUser();
+  if (!user) { toast('برای ثبت امضا، ورود امن الزامی است.'); window.Governance?.openAuthentication(); return; }
+  const signer = user.name || '';
+  if ($('inspectorName')) $('inspectorName').value = signer;
   const visitDate = $('jdateBtn')?.textContent.trim() || jfmt(selectedJ);
   const dataUri = $('signatureCanvas').toDataURL('image/png');
-  if (!Native?.isNative?.() || !Native.saveSignature({ dataUri, signer, visitDate, ownerId: currentInspection.id })) {
+  if (!Native?.isNative?.() || !Native.saveSignature({ dataUri, signer, signerId: user.id, visitDate, ownerId: currentInspection.id })) {
     toast('ذخیره فایل امضا در دستگاه آغاز نشد.');
     return;
   }
@@ -1171,7 +1209,7 @@ window.receiveSignatureSaved = function receiveSignatureSaved(raw) {
   if (!media.mediaId || !currentInspection) { toast('ذخیره تصویر امضا ناموفق بود.'); return; }
   currentInspection.signaturePresent = true;
   currentInspection.signatureAttachment = {
-    ...media, signer: media.signer || $('inspectorName')?.value.trim() || 'بازرس', visitDate: media.visitDate || $('jdateBtn')?.textContent.trim() || '',
+    ...media, signer: media.signer || getActiveUser()?.name || 'بازرس', signerId: media.signerId || getActiveUser()?.id || '', visitDate: media.visitDate || $('jdateBtn')?.textContent.trim() || '',
   };
   window.autosaveCurrentInspection?.();
   closeModal('signatureModal');

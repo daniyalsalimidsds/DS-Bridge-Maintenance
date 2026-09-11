@@ -7,17 +7,17 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 /**
- * Atomically commits an inspection finalization bundle.
+ * Legacy v1.6 transactional fixture retained only for migration regression tests.
  *
- * The existing draft is left untouched if any entity in the bundle is invalid or any
- * SQLite write fails. This keeps inspection, defects, reminders and audit metadata from
- * diverging after a crash or storage error.
+ * It is package-private and has no production caller. Runtime finalization is explicitly
+ * rejected by MainActivity and all official transitions use InspectionGovernance.
  */
-public final class TransactionalFinalizer {
+@Deprecated
+final class TransactionalFinalizer {
     private TransactionalFinalizer() {}
 
-    public static void commit(AppDb db, JSONObject inspection, JSONArray defects,
-                              JSONArray reminders, JSONObject audit) throws Exception {
+    static void commit(AppDb db, JSONObject inspection, JSONArray defects,
+                       JSONArray reminders, JSONObject audit) throws Exception {
         if (db == null || inspection == null) throw new IllegalArgumentException("Missing inspection finalization payload");
         validateEntity(inspection, "inspection");
         if (!"نهایی".equals(inspection.optString("status"))) throw new IllegalArgumentException("Inspection is not final");
@@ -44,7 +44,7 @@ public final class TransactionalFinalizer {
             upsert(sql, "inspections", inspection);
             for (int i=0;i<defects.length();i++) upsert(sql, "defects", defects.getJSONObject(i));
             for (int i=0;i<reminders.length();i++) upsert(sql, "reminders", reminders.getJSONObject(i));
-            upsert(sql, "audit", audit);
+            AuditLog.append(sql, audit);
             sql.setTransactionSuccessful();
         } finally {
             sql.endTransaction();

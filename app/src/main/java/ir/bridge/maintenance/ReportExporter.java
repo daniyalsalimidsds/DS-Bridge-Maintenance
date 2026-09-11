@@ -32,16 +32,17 @@ public final class ReportExporter {
     public File create(String format,String requestedName,JSONObject payload)throws Exception{
         File dir=new File(context.getCacheDir(),"exports");if(!dir.exists()&&!dir.mkdirs())throw new IllegalStateException("Cannot create export cache");
         String ext="pdf".equals(format)?".pdf":"xlsx".equals(format)?".xlsx":"zip".equals(format)?".zip":".csv",name=safeFileName(requestedName,"bridge-inspection-report"+ext);if(!name.toLowerCase(Locale.ROOT).endsWith(ext))name+=ext;
-        File out=new File(dir,System.currentTimeMillis()+"-"+name);JSONArray rows=sanitizeChecklistRows(payload.optJSONArray("rows")),reportInfo=payload.optJSONArray("reportRows"),profiles=payload.optJSONArray("profileRows"),pdfRows=sanitizeChecklistRows(payload.optJSONArray("pdfRows"));if(reportInfo==null)reportInfo=new JSONArray();if(profiles==null)profiles=new JSONArray();if(pdfRows.length()==0)pdfRows=rows;JSONObject meta=payload.optJSONObject("meta");if(meta==null)meta=new JSONObject();
-        switch(format){case"pdf":writePdf(out,meta,reportInfo,profiles,pdfRows);break;case"xlsx":writeXlsx(out,reportInfo,profiles,rows);break;case"csv":writeCsv(out,reportInfo,profiles,rows);break;case"zip":writeBundle(out,meta,reportInfo,profiles,rows,pdfRows,payload.optJSONArray("records"),payload.optJSONArray("bridges"),payload.optJSONObject("profileSchema"),payload.optJSONObject("engineeringReferences"));break;default:throw new IllegalArgumentException("Unsupported export format");}return out;
+        File out=new File(dir,System.currentTimeMillis()+"-"+name);JSONArray rows=sanitizeChecklistRows(payload.optJSONArray("rows")),reportInfo=payload.optJSONArray("reportRows"),profiles=payload.optJSONArray("profileRows"),pdfRows=sanitizeChecklistRows(payload.optJSONArray("pdfRows")),records=payload.optJSONArray("records"),criticalFindings=payload.optJSONArray("criticalFindings");if(reportInfo==null)reportInfo=new JSONArray();if(profiles==null)profiles=new JSONArray();if(pdfRows.length()==0)pdfRows=rows;if(records==null)records=new JSONArray();if(criticalFindings==null)criticalFindings=new JSONArray();reportInfo=appendGovernanceRows(reportInfo,records,criticalFindings);JSONObject meta=payload.optJSONObject("meta");if(meta==null)meta=new JSONObject();
+        switch(format){case"pdf":writePdf(out,meta,reportInfo,profiles,pdfRows);break;case"xlsx":writeXlsx(out,reportInfo,profiles,rows);break;case"csv":writeCsv(out,reportInfo,profiles,rows);break;case"zip":writeBundle(out,meta,reportInfo,profiles,rows,pdfRows,records,criticalFindings,payload.optJSONArray("bridges"),payload.optJSONObject("profileSchema"),payload.optJSONObject("engineeringReferences"));break;default:throw new IllegalArgumentException("Unsupported export format");}return out;
     }
-    private void writeBundle(File out,JSONObject meta,JSONArray reportInfo,JSONArray profiles,JSONArray rows,JSONArray pdfRows,JSONArray records,JSONArray bridges,JSONObject profileSchema,JSONObject references)throws Exception{
+    private void writeBundle(File out,JSONObject meta,JSONArray reportInfo,JSONArray profiles,JSONArray rows,JSONArray pdfRows,JSONArray records,JSONArray criticalFindings,JSONArray bridges,JSONObject profileSchema,JSONObject references)throws Exception{
         File dir=out.getParentFile(),pdf=new File(dir,out.getName()+".tmp.pdf"),xlsx=new File(dir,out.getName()+".tmp.xlsx"),csv=new File(dir,out.getName()+".tmp.csv");
         try{
             writePdf(pdf,meta,reportInfo,profiles,pdfRows);writeXlsx(xlsx,reportInfo,profiles,rows);writeCsv(csv,reportInfo,profiles,rows);
             try(ZipOutputStream z=new ZipOutputStream(new FileOutputStream(out))){
                 zipFile(z,"report/bridge-inspection-report.pdf",pdf);zipFile(z,"report/bridge-inspection-report.xlsx",xlsx);zipFile(z,"report/bridge-inspection-report.csv",csv);
                 zipText(z,"data/inspections.json",records==null?"[]":records.toString(2));
+                zipText(z,"data/critical-findings.json",criticalFindings==null?"[]":criticalFindings.toString(2));
                 zipText(z,"data/bridges.json",bridges==null?"[]":bridges.toString(2));
                 zipText(z,"data/bridge-profile-schema.json",profileSchema==null?"{}":profileSchema.toString(2));
                 zipText(z,"data/engineering-references.json",references==null?"{}":references.toString(2));
@@ -54,6 +55,39 @@ public final class ReportExporter {
                 }
             }
         }finally{pdf.delete();xlsx.delete();csv.delete();}
+    }
+    private static JSONArray appendGovernanceRows(JSONArray source,JSONArray records,JSONArray criticalFindings)throws Exception{
+        JSONArray rows=new JSONArray(source.toString());
+        if(records.length()>0){
+            rows.put(new JSONArray());
+            rows.put(new JSONArray().put("زنجیره هویت و تأیید").put("جزئیات ثبت‌شده"));
+            for(int i=0;i<records.length();i++){
+                JSONObject record=records.optJSONObject(i);if(record==null)continue;
+                JSONObject signature=record.optJSONObject("signatureAttachment");
+                String label="گزارش "+record.optString("reportNo",record.optString("no",record.optString("id")));
+                String detail="بازرس: "+record.optString("inspector")+" ["+record.optString("inspectorId")+"]"
+                        +" | امضا: "+(signature==null?"ثبت نشده":signature.optString("mediaId"))+" | هش رکورد: "+record.optString("fieldHash",record.optString("identityStatus","legacy-unverified"))
+                        +" | ارسال: "+record.optString("submittedAt","ثبت نشده")+" | QC: "+record.optString("qcReviewer","میراثی/ثبت نشده")
+                        +" ["+record.optString("qcReviewerId")+"] | تأیید: "+record.optString("approvedAt","ثبت نشده")+" | نظر QC: "+record.optString("qcComment","");
+                rows.put(new JSONArray().put(label).put(detail));
+            }
+        }
+        rows.put(new JSONArray());
+        rows.put(new JSONArray().put("پرونده‌های یافته بحرانی").put("جزئیات ایمنی و پیگیری"));
+        if(criticalFindings.length()==0)rows.put(new JSONArray().put("تعداد پرونده مرتبط").put("۰"));
+        for(int i=0;i<criticalFindings.length();i++){
+            JSONObject item=criticalFindings.optJSONObject(i);if(item==null)continue;
+            String label=item.optString("id")+" • "+item.optString("itemCode")+" • "+item.optString("title");
+            String detail="وضعیت: "+item.optString("status")+" | کشف: "+item.optString("discoveredAt")
+                    +" | اقدام فوری: "+item.optString("immediateAction")+" | محدودیت: "+item.optString("operatingRestriction")
+                    +" — "+item.optString("restrictionRationale")+" | اعلان: "+item.optString("notifiedContact")+" @ "+item.optString("notifiedAt")
+                    +" | مسئول: "+item.optString("ownerId")+" | مهلت: "+item.optString("dueAt")
+                    +" | تشدید پیگیری: "+item.optString("escalationStatus")+" — "+item.optString("overdueReason")
+                    +" | پذیرش: "+item.optString("acknowledgmentStatus")+" | رفع خطر: "+item.optString("resolutionSummary")
+                    +" | مدرک: "+item.optString("resolutionEvidence")+" | بستن مستقل: "+item.optString("closedBy");
+            rows.put(new JSONArray().put(label).put(detail));
+        }
+        return rows;
     }
     private void addPhotos(ZipOutputStream z,JSONArray photos,String prefix,Set<String> seen)throws Exception{if(photos==null||mediaStore==null)return;for(int i=0;i<photos.length();i++){JSONObject p=photos.optJSONObject(i);if(p==null)continue;String mid=p.optString("mediaId",p.optString("id",""));if(mid.isEmpty()||!seen.add(mid))continue;File f=mediaStore.resolveMedia(mid);if(f==null)continue;String name=safeZipPart(p.optString("name",f.getName()));if(name.isEmpty())name="image-"+(i+1)+".jpg";zipFile(z,prefix+name,f);}}
     private static void zipFile(ZipOutputStream z,String path,File file)throws Exception{z.putNextEntry(new ZipEntry(path));try(FileInputStream in=new FileInputStream(file)){byte[] b=new byte[65536];int n;while((n=in.read(b))!=-1)z.write(b,0,n);}z.closeEntry();}

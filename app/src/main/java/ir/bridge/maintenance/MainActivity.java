@@ -57,17 +57,25 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public final class MainActivity extends ComponentActivity {
     private static final long MAX_BRIDGE_MESSAGE=6_000_000L;
-    private WebView webView;private AppDb db;private AppMediaStore mediaStore;private ReportExporter reportExporter;private BackupManager backupManager;private WebViewAssetLoader assetLoader;private final ExecutorService io=Executors.newSingleThreadExecutor();private volatile boolean migrationDone=false,pageReady=false;
+    private static final Set<String> BRIDGE_ENTITY_KINDS=Collections.unmodifiableSet(new HashSet<>(Arrays.asList("bridges","standards","inspections","defects","settings","reminders")));
+    private static final Set<String> GOVERNANCE_OPERATIONS=Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
+            "authStatus","authenticate","enrollPin","lockSession","saveGovernedUser",
+            "deactivateGovernedUser","submitInspection","reviewInspection","voidInspection",
+            "createCorrectionDraft","saveInspectionProgram","updateCriticalFinding","appendAudit")));
+    private WebView webView;private AppDb db;private AppMediaStore mediaStore;private ReportExporter reportExporter;private BackupManager backupManager;private CredentialManager credentialManager;private InspectionGovernance governance;private WebViewAssetLoader assetLoader;private final ExecutorService io=Executors.newSingleThreadExecutor();private volatile boolean migrationDone=false,pageReady=false;
     private File pendingExportFile;private String pendingExportName="bridge-inspection-report.bin";private PhotoContext pendingPhoto;private File pendingCameraFile;private Uri pendingBackupUri;
     private ActivityResultLauncher<PickVisualMediaRequest> photoPicker;private ActivityResultLauncher<Uri> cameraLauncher;private ActivityResultLauncher<String[]> backupPicker,bridgePicker;private ActivityResultLauncher<String> pdfDocumentLauncher,csvDocumentLauncher,xlsxDocumentLauncher,backupDocumentLauncher;private ActivityResultLauncher<String> notificationPermission;private ActivityResultLauncher<String[]> locationPermission;private String pendingLocationTarget="";private long locationRequestToken=0L;
 
-    @Override protected void onCreate(Bundle savedInstanceState){super.onCreate(savedInstanceState);WindowCompat.setDecorFitsSystemWindows(getWindow(),false);registerActivityResults();createNotificationChannel();if(!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)){new AlertDialog.Builder(this).setTitle("به‌روزرسانی مؤلفه نمایش لازم است").setMessage("Android System WebView یا Chrome را از فروشگاه معتبر گوشی به‌روزرسانی کنید و برنامه را دوباره باز کنید. اطلاعات ذخیره‌شده شما حفظ می‌شود.").setPositiveButton("بستن",(dialog,which)->finish()).setOnCancelListener(dialog->finish()).show();return;}db=new AppDb(getApplicationContext());mediaStore=new AppMediaStore(getApplicationContext(),db);reportExporter=new ReportExporter(getApplicationContext(),mediaStore);backupManager=new BackupManager(getApplicationContext(),db,mediaStore);configureWebView();configureBack();setContentView(webView);applyImmersiveMode();io.execute(()->{InlinePhotoMigrator.MigrationResult r=new InlinePhotoMigrator(db,mediaStore).run();migrationDone=true;runOnUiThread(()->{maybeBootstrap();if(r.failures>0)toast("انتقال برخی تصاویر قدیمی کامل نشد؛ داده اصلی حذف نشده است.");});});webView.loadUrl(BuildConfig.APP_ORIGIN+"/assets/index.html");}
+    @Override protected void onCreate(Bundle savedInstanceState){super.onCreate(savedInstanceState);WindowCompat.setDecorFitsSystemWindows(getWindow(),false);registerActivityResults();createNotificationChannel();if(!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)){new AlertDialog.Builder(this).setTitle("به‌روزرسانی مؤلفه نمایش لازم است").setMessage("Android System WebView یا Chrome را از فروشگاه معتبر گوشی به‌روزرسانی کنید و برنامه را دوباره باز کنید. اطلاعات ذخیره‌شده شما حفظ می‌شود.").setPositiveButton("بستن",(dialog,which)->finish()).setOnCancelListener(dialog->finish()).show();return;}db=new AppDb(getApplicationContext());credentialManager=new CredentialManager(db);governance=new InspectionGovernance(db,credentialManager);mediaStore=new AppMediaStore(getApplicationContext(),db);reportExporter=new ReportExporter(getApplicationContext(),mediaStore);backupManager=new BackupManager(getApplicationContext(),db,mediaStore);configureWebView();configureBack();setContentView(webView);applyImmersiveMode();io.execute(()->{InlinePhotoMigrator.MigrationResult r=new InlinePhotoMigrator(db,mediaStore).run();migrationDone=true;runOnUiThread(()->{maybeBootstrap();if(r.failures>0)toast("انتقال برخی تصاویر قدیمی کامل نشد؛ داده اصلی حذف نشده است.");});});webView.loadUrl(BuildConfig.APP_ORIGIN+"/assets/index.html");}
 
     private void configureWebView(){
         assetLoader=new WebViewAssetLoader.Builder().addPathHandler("/assets/",new WebViewAssetLoader.AssetsPathHandler(this)).addPathHandler("/media-thumb/",path->{try{String mid=Uri.decode(path==null?"":path.replaceFirst("^/+",""));File f=mediaStore.resolveThumbnail(mid);if(f==null)return new WebResourceResponse("text/plain","UTF-8",404,"Not Found",Collections.emptyMap(),new ByteArrayInputStream(new byte[0]));return new WebResourceResponse("image/jpeg",null,new FileInputStream(f));}catch(Exception e){return new WebResourceResponse("text/plain","UTF-8",new ByteArrayInputStream(new byte[0]));}}).addPathHandler("/media/",path->{try{String mid=Uri.decode(path==null?"":path.replaceFirst("^/+",""));File f=mediaStore.resolveMedia(mid);AppDb.MediaRecord m=db.mediaById(mid);if(f==null||m==null)return new WebResourceResponse("text/plain","UTF-8",404,"Not Found",Collections.emptyMap(),new ByteArrayInputStream(new byte[0]));return new WebResourceResponse(m.mime,null,new FileInputStream(f));}catch(Exception e){return new WebResourceResponse("text/plain","UTF-8",new ByteArrayInputStream(new byte[0]));}}).build();
@@ -154,16 +162,136 @@ public final class MainActivity extends ComponentActivity {
         if(!isMainFrame||!trusted(sourceOrigin))return;
         try{
             JSONObject request=new JSONObject(message.getData());String type=request.optString("type","");
-            if("deleteBatch".equals(type)){handleDeleteBatch(request.optJSONObject("payload"));reply.postMessage("{\"ok\":true,\"accepted\":true}");return;}
-            if("pickBridge".equals(type)){runOnUiThread(()->bridgePicker.launch(new String[]{"application/json","application/octet-stream"}));reply.postMessage("{\"ok\":true}");return;}
-            if("exportBridge".equals(type)){JSONObject payload=request.optJSONObject("payload"),bridge=payload==null?null:payload.optJSONObject("bridge");if(bridge==null)throw new IllegalArgumentException("missing bridge");io.execute(()->shareBridgeFile(bridge));reply.postMessage("{\"ok\":true}");return;}
+            if("deleteBatch".equals(type)){credentialManager.requireAuthenticated();handleDeleteBatch(request.optJSONObject("payload"));reply.postMessage("{\"ok\":true,\"accepted\":true}");return;}
+            if("pickBridge".equals(type)){credentialManager.requireRole("سرپرست","مدیر سیستم");runOnUiThread(()->bridgePicker.launch(new String[]{"application/json","application/octet-stream"}));reply.postMessage("{\"ok\":true}");return;}
+            if("exportBridge".equals(type)){credentialManager.requireAuthenticated();JSONObject payload=request.optJSONObject("payload"),bridge=payload==null?null:payload.optJSONObject("bridge");if(bridge==null)throw new IllegalArgumentException("missing bridge");io.execute(()->shareBridgeFile(bridge));reply.postMessage("{\"ok\":true}");return;}
             reply.postMessage("{\"ok\":false,\"error\":\"unknown-type\"}");
         }catch(Exception e){reply.postMessage("{\"ok\":false,\"error\":\"invalid-payload\"}");}
     }
     private void shareBridgeFile(JSONObject bridge){try{JSONObject envelope=new JSONObject().put("format","bridge-maintenance-bridge").put("version",1).put("appVersion",BuildConfig.VERSION_NAME).put("bridge",bridge);File dir=new File(getCacheDir(),"exports");if(!dir.exists()&&!dir.mkdirs())throw new IllegalStateException("export directory");String name="bridge-"+bounded(bridge.optString("code",bridge.optString("name","record")),60).replaceAll("[^\\p{L}\\p{N}._-]+","_")+".bridge.json";File file=new File(dir,name);try(FileOutputStream out=new FileOutputStream(file)){out.write(envelope.toString(2).getBytes(StandardCharsets.UTF_8));out.getFD().sync();}Uri uri=FileProvider.getUriForFile(this,getString(R.string.provider_authority),file);Intent send=new Intent(Intent.ACTION_SEND).setType("application/json").putExtra(Intent.EXTRA_STREAM,uri).putExtra(Intent.EXTRA_SUBJECT,"مشخصات پل").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);runOnUiThread(()->startActivity(Intent.createChooser(send,"اشتراک‌گذاری پل")));}catch(Exception e){runOnUiThread(()->toast("ساخت فایل پل ناموفق بود."));}}
     private void importBridgeFile(Uri uri){try(InputStream in=getContentResolver().openInputStream(uri)){if(in==null)throw new IllegalArgumentException("file");byte[] bytes=readLimited(in,2_000_000);JSONObject envelope=new JSONObject(new String(bytes,StandardCharsets.UTF_8));if(!"bridge-maintenance-bridge".equals(envelope.optString("format"))||envelope.optInt("version")!=1)throw new IllegalArgumentException("format");JSONObject bridge=envelope.optJSONObject("bridge");if(bridge==null)throw new IllegalArgumentException("bridge");String id="bridge-import-"+System.currentTimeMillis();bridge.put("id",id).put("updatedAt",System.currentTimeMillis());if(bridge.optString("name").trim().isEmpty()&&bridge.optString("code").trim().isEmpty())throw new IllegalArgumentException("identity");if(!db.save("bridges",id,bridge.toString()))throw new IllegalStateException("save");runOnUiThread(()->{maybeBootstrap();toast("فایل پل با موفقیت افزوده شد.");});}catch(Exception e){runOnUiThread(()->toast("فایل پل معتبر نیست یا قابل خواندن نیست."));}}
     private static byte[] readLimited(InputStream in,int limit)throws Exception{java.io.ByteArrayOutputStream out=new java.io.ByteArrayOutputStream();byte[] b=new byte[8192];int total=0,n;while((n=in.read(b))!=-1){total+=n;if(total>limit)throw new IllegalArgumentException("too large");out.write(b,0,n);}return out.toByteArray();}
-    private void onBridgeMessage(@NonNull WebView view,@NonNull WebMessageCompat message,@NonNull Uri sourceOrigin,boolean isMainFrame,@NonNull JavaScriptReplyProxy reply){if(!isMainFrame||!trusted(sourceOrigin))return;String raw=message.getData();if(raw==null||raw.length()>MAX_BRIDGE_MESSAGE){reply.postMessage("{\"ok\":false,\"error\":\"invalid-message\"}");return;}try{JSONObject req=new JSONObject(raw),p=req.optJSONObject("payload");if(p==null)p=new JSONObject();String type=req.optString("type","");switch(type){case"dbSave":{String kind=p.optString("kind"),id=p.optString("id"),json=p.optString("json");boolean ok=safeKind(kind)&&safeId(id)&&json.length()<=5_000_000&&validJson(json)&&db.save(kind,id,json);reply.postMessage(ok?"{\"ok\":true}":"{\"ok\":false,\"error\":\"db-save\"}");break;}case"dbDelete":{String kind=p.optString("kind"),id=p.optString("id");boolean ok=safeKind(kind)&&safeId(id)&&db.delete(kind,id);reply.postMessage(ok?"{\"ok\":true}":"{\"ok\":false,\"error\":\"db-delete\"}");break;}case"deleteBatch":{handleDeleteBatch(p);reply.postMessage("{\"ok\":true,\"accepted\":true}");break;}case"finalizeInspection":{handleFinalizeInspection(p);reply.postMessage("{\"ok\":true,\"accepted\":true}");break;}case"pickImage":pendingPhoto=PhotoContext.from(p);runOnUiThread(()->photoPicker.launch(new PickVisualMediaRequest.Builder().setMediaType(ActivityResultContracts.PickVisualMedia.ImageOnly.INSTANCE).build()));reply.postMessage("{\"ok\":true}");break;case"takePhoto":PhotoContext cameraContext=PhotoContext.from(p);runOnUiThread(()->startCamera(cameraContext));reply.postMessage("{\"ok\":true}");break;case"requestLocation":{requestOccurrenceLocation(p);reply.postMessage("{\"ok\":true,\"accepted\":true}");break;}case"openLocationSettings":{runOnUiThread(()->{try{startActivity(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS));}catch(Exception e){toast("تنظیمات موقعیت مکانی در دسترس نیست.");}});reply.postMessage("{\"ok\":true}");break;}case"saveSignature":{String dataUri=p.optString("dataUri"),signer=bounded(p.optString("signer","امضا"),80),visitDate=bounded(p.optString("visitDate",""),20),ownerId=bounded(p.optString("ownerId",""),180);if(ownerId.isEmpty()||dataUri.length()>5_800_000){reply.postMessage("{\"ok\":false,\"error\":\"invalid-signature\"}");break;}io.execute(()->{try{JSONObject m=mediaStore.saveSignatureDataUri(dataUri,signer,visitDate,ownerId);m.put("signer",signer);m.put("visitDate",visitDate);runOnUiThread(()->postJsString("window.receiveSignatureSaved",m.toString()));}catch(Exception e){runOnUiThread(()->postJsString("window.receiveSignatureSaved","{\"ok\":false}"));}});reply.postMessage("{\"ok\":true,\"accepted\":true}");break;}case"pickBackup":runOnUiThread(()->backupPicker.launch(new String[]{"application/json","application/zip","application/octet-stream"}));reply.postMessage("{\"ok\":true}");break;case"exportReport":{String format=p.optString("format"),name=p.optString("name");JSONObject report=p.optJSONObject("report");if(report==null)throw new IllegalArgumentException("missing report");io.execute(()->{try{File f=reportExporter.create(format,name,report);runOnUiThread(()->beginExport(f,name,mimeFor(format)));}catch(Exception e){runOnUiThread(()->toast("ساخت فایل خروجی ناموفق بود."));}});reply.postMessage("{\"ok\":true}");break;}case"exportBackup":io.execute(()->{try{File f=backupManager.createPackage();runOnUiThread(()->beginExport(f,"bridge-maintenance-backup.zip","application/zip"));}catch(Exception e){runOnUiThread(()->toast("ساخت فایل پشتیبان ناموفق بود."));}});reply.postMessage("{\"ok\":true}");break;case"restorePendingBackup":{Uri uri=pendingBackupUri;if(uri==null){reply.postMessage("{\"ok\":false,\"error\":\"no-pending-backup\"}");break;}pendingBackupUri=null;io.execute(()->performBackupRestore(uri));reply.postMessage("{\"ok\":true}");break;}case"scheduleReminder":scheduleReminder(p);reply.postMessage("{\"ok\":true}");break;default:reply.postMessage("{\"ok\":false,\"error\":\"unknown-type\"}");}}catch(Exception e){reply.postMessage("{\"ok\":false,\"error\":\"invalid-payload\"}");}}
+    private void onBridgeMessage(@NonNull WebView view,@NonNull WebMessageCompat message,@NonNull Uri sourceOrigin,boolean isMainFrame,@NonNull JavaScriptReplyProxy reply){
+        if(!isMainFrame||!trusted(sourceOrigin))return;
+        String raw=message.getData();
+        if(raw==null||raw.length()>MAX_BRIDGE_MESSAGE){reply.postMessage("{\"ok\":false,\"error\":\"invalid-message\"}");return;}
+        try{
+            JSONObject req=new JSONObject(raw),p=req.optJSONObject("payload");
+            if(p==null)p=new JSONObject();
+            String type=req.optString("type","");
+            if(isGovernanceOperation(type)){
+                handleGovernanceOperation(type,p);
+                reply.postMessage("{\"ok\":true,\"accepted\":true}");
+                return;
+            }
+            switch(type){
+                case"dbSave":{
+                    String kind=p.optString("kind"),id=p.optString("id"),json=p.optString("json");
+                    credentialManager.requireAuthenticated();
+                    boolean ok=bridgeSaveAllowed(kind,id,json)&&db.save(kind,id,json);
+                    reply.postMessage(ok?"{\"ok\":true}":"{\"ok\":false,\"error\":\"db-save\"}");
+                    break;
+                }
+                case"dbDelete":{
+                    String kind=p.optString("kind"),id=p.optString("id");
+                    credentialManager.requireAuthenticated();
+                    boolean ok=safeKind(kind)&&safeId(id)&&db.delete(kind,id);
+                    reply.postMessage(ok?"{\"ok\":true}":"{\"ok\":false,\"error\":\"db-delete\"}");
+                    break;
+                }
+                case"deleteBatch":credentialManager.requireAuthenticated();handleDeleteBatch(p);reply.postMessage("{\"ok\":true,\"accepted\":true}");break;
+                case"finalizeInspection":reply.postMessage("{\"ok\":false,\"error\":\"legacy-finalization-disabled\"}");break;
+                case"pickImage":credentialManager.requireAuthenticated();pendingPhoto=PhotoContext.from(p);runOnUiThread(()->photoPicker.launch(new PickVisualMediaRequest.Builder().setMediaType(ActivityResultContracts.PickVisualMedia.ImageOnly.INSTANCE).build()));reply.postMessage("{\"ok\":true}");break;
+                case"takePhoto":credentialManager.requireAuthenticated();PhotoContext cameraContext=PhotoContext.from(p);runOnUiThread(()->startCamera(cameraContext));reply.postMessage("{\"ok\":true}");break;
+                case"requestLocation":credentialManager.requireAuthenticated();requestOccurrenceLocation(p);reply.postMessage("{\"ok\":true,\"accepted\":true}");break;
+                case"openLocationSettings":runOnUiThread(()->{try{startActivity(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS));}catch(Exception e){toast("تنظیمات موقعیت مکانی در دسترس نیست.");}});reply.postMessage("{\"ok\":true}");break;
+                case"saveSignature":{
+                    String dataUri=p.optString("dataUri"),signer=bounded(p.optString("signer","امضا"),80),signerId=bounded(p.optString("signerId",""),180),visitDate=bounded(p.optString("visitDate",""),20),ownerId=bounded(p.optString("ownerId",""),180);
+                    JSONObject authenticated=credentialManager.requireAuthenticated();
+                    if(ownerId.isEmpty()||dataUri.length()>5_800_000||!authenticated.optString("id").equals(signerId)){
+                        reply.postMessage("{\"ok\":false,\"error\":\"invalid-signature\"}");break;
+                    }
+                    io.execute(()->{try{JSONObject m=mediaStore.saveSignatureDataUri(dataUri,signer,visitDate,ownerId);m.put("signer",signer);m.put("signerId",signerId);m.put("visitDate",visitDate);runOnUiThread(()->postJsString("window.receiveSignatureSaved",m.toString()));}catch(Exception e){runOnUiThread(()->postJsString("window.receiveSignatureSaved","{\"ok\":false}"));}});
+                    reply.postMessage("{\"ok\":true,\"accepted\":true}");
+                    break;
+                }
+                case"pickBackup":credentialManager.requireRole("مدیر سیستم");runOnUiThread(()->backupPicker.launch(new String[]{"application/json","application/zip","application/octet-stream"}));reply.postMessage("{\"ok\":true}");break;
+                case"exportReport":{
+                    String format=p.optString("format"),name=p.optString("name");JSONObject report=p.optJSONObject("report");
+                    credentialManager.requireAuthenticated();
+                    if(report==null||!governance.reportPayloadIsOfficial(report))throw new SecurityException("unapproved-or-tampered-report");
+                    io.execute(()->{try{File f=reportExporter.create(format,name,report);runOnUiThread(()->beginExport(f,name,mimeFor(format)));}catch(Exception e){runOnUiThread(()->toast("ساخت فایل خروجی ناموفق بود."));}});
+                    reply.postMessage("{\"ok\":true}");break;
+                }
+                case"exportBackup":credentialManager.requireRole("سرپرست","مدیر سیستم");io.execute(()->{try{File f=backupManager.createPackage();runOnUiThread(()->beginExport(f,"bridge-maintenance-backup.zip","application/zip"));}catch(Exception e){runOnUiThread(()->toast("ساخت فایل پشتیبان ناموفق بود."));}});reply.postMessage("{\"ok\":true}");break;
+                case"restorePendingBackup":{
+                    credentialManager.requireRole("مدیر سیستم");
+                    Uri uri=pendingBackupUri;if(uri==null){reply.postMessage("{\"ok\":false,\"error\":\"no-pending-backup\"}");break;}
+                    pendingBackupUri=null;io.execute(()->performBackupRestore(uri));reply.postMessage("{\"ok\":true}");break;
+                }
+                case"scheduleReminder":scheduleReminder(p);reply.postMessage("{\"ok\":true}");break;
+                default:reply.postMessage("{\"ok\":false,\"error\":\"unknown-type\"}");
+            }
+        }catch(Exception e){reply.postMessage("{\"ok\":false,\"error\":\"invalid-payload\"}");}
+    }
+
+    private static boolean isGovernanceOperation(String type){
+        return GOVERNANCE_OPERATIONS.contains(type);
+    }
+
+    private void handleGovernanceOperation(String type,JSONObject payload){
+        final String requestId=bounded(payload.optString("requestId",""),120);
+        if(requestId.isEmpty()){
+            postNativeRequestResult("",new JSONObject(),new IllegalArgumentException("request-id-required"));
+            return;
+        }
+        io.execute(()->{
+            JSONObject result=null;Exception failure=null;
+            try{result=governance.dispatch(type,payload);}
+            catch(Exception error){failure=error;}
+            JSONObject delivered=result;Exception deliveredFailure=failure;
+            runOnUiThread(()->postNativeRequestResult(requestId,delivered,deliveredFailure));
+        });
+    }
+
+    private void postNativeRequestResult(String requestId,JSONObject result,Exception failure){
+        try{
+            JSONObject response=result==null?new JSONObject():new JSONObject(result.toString());
+            response.put("requestId",requestId);
+            if(failure!=null){
+                String code=failure.getMessage();
+                if(code==null||!code.matches("[A-Za-z0-9_\\-]{1,100}"))code="operation-failed";
+                response=new JSONObject().put("ok",false).put("requestId",requestId).put("error",code);
+            }
+            postJsString("window.receiveNativeRequestResult",response.toString());
+        }catch(Exception ignored){postJsString("window.receiveNativeRequestResult","{\"ok\":false,\"error\":\"operation-failed\"}");}
+    }
+
+    private boolean bridgeSaveAllowed(String kind,String id,String json){
+        if(!BRIDGE_ENTITY_KINDS.contains(kind)||!safeId(id)||json==null||json.length()>5_000_000||!validJson(json))return false;
+        if(!"inspections".equals(kind))return true;
+        try{
+            JSONObject value=new JSONObject(json);
+            String workflow=value.optString("workflowStatus","draft");
+            String status=value.optString("status","پیش‌نویس");
+            JSONObject existing=db.find("inspections",id);
+            if(existing==null)return ("draft".equals(workflow)||workflow.isEmpty())&&"پیش‌نویس".equals(status);
+            String existingWorkflow=existing.optString("workflowStatus",existing.optString("status").equals("نهایی")?"approved":"draft");
+            if("submitted".equals(existingWorkflow)||"approved".equals(existingWorkflow)||existing.has("approvedAt"))return false;
+            if("returned".equals(existingWorkflow)){
+                if(!"returned".equals(workflow)||!"بازگشت برای اصلاح".equals(status))return false;
+                for(String key:new String[]{"submittedAt","submittedByUserId","submissionCycle","createdByUserId",
+                        "supersedesInspectionId","inspectorId","draftReference","fieldHash","inspectorReassignments"})
+                    if(!sameJsonField(existing,value,key))return false;
+                return true;
+            }
+            return ("draft".equals(workflow)||workflow.isEmpty())&&"پیش‌نویس".equals(status);
+        }catch(Exception error){return false;}
+    }
+    private static boolean sameJsonField(JSONObject first,JSONObject second,String key){
+        if(first.has(key)!=second.has(key))return false;
+        return !first.has(key)||String.valueOf(first.opt(key)).equals(String.valueOf(second.opt(key)));
+    }
     /** Execute a delete batch off the WebView thread and always resolve the
      * JavaScript waiter, even when the requested ids are already absent. */
     private void handleDeleteBatch(JSONObject payload){
@@ -201,6 +329,7 @@ public final class MainActivity extends ComponentActivity {
                 if (requestId.isEmpty() || entries == null || entries.length() > 5000) {
                     return result.put("ok", false).put("requestId", requestId).put("error", "invalid-delete-batch").toString();
                 }
+                credentialManager.requireAuthenticated();
                 AppDb.DeleteResult deleted = db.deleteMany(entries);
                 int mediaDeleted = mediaStore.deleteFiles(deleted.media);
                 return result.put("ok", true).put("requestId", requestId)
@@ -214,19 +343,6 @@ public final class MainActivity extends ComponentActivity {
         }
     }
 
-    private void handleFinalizeInspection(JSONObject payload){
-        JSONObject inspection=payload.optJSONObject("inspection"),audit=payload.optJSONObject("audit");
-        JSONArray defects=payload.optJSONArray("defects"),reminders=payload.optJSONArray("reminders");
-        if(inspection==null||audit==null||defects==null||reminders==null||defects.length()>2000||reminders.length()>10){
-            postJsString("window.receiveFinalizeResult","{\"ok\":false}");return;
-        }
-        io.execute(()->{try{
-            TransactionalFinalizer.commit(db,inspection,defects,reminders,audit);
-            runOnUiThread(()->postJsString("window.receiveFinalizeResult","{\"ok\":true}"));
-        }catch(Exception e){
-            runOnUiThread(()->postJsString("window.receiveFinalizeResult","{\"ok\":false}"));
-        }});
-    }
     private void maybeBootstrap(){if(!pageReady||!migrationDone||webView==null)return;String snapshot=db.snapshotJson(),js="window.BridgeNativeClient&&window.BridgeNativeClient.bootstrap("+JSONObject.quote(snapshot)+","+JSONObject.quote(BuildConfig.VERSION_NAME)+","+BuildConfig.VERSION_CODE+");";webView.evaluateJavascript(js,null);}
     private void registerActivityResults(){photoPicker=registerForActivityResult(new ActivityResultContracts.PickVisualMedia(),uri->{if(uri!=null&&pendingPhoto!=null){PhotoContext pc=pendingPhoto;io.execute(()->{try{JSONObject m=mediaStore.importUri(uri,pc.subsection,pc.visitDate,pc.ownerKind,pc.ownerId);m.put("target",pc.target);m.put("itemKey",pc.itemKey);m.put("requestId",pc.requestId);runOnUiThread(()->postJsString("window.receivePickedImage",m.toString()));}catch(Exception e){runOnUiThread(()->toast("ذخیره تصویر ناموفق بود."));}});}});cameraLauncher=registerForActivityResult(new ActivityResultContracts.TakePicture(),ok->{if(Boolean.TRUE.equals(ok)&&pendingCameraFile!=null&&pendingPhoto!=null){PhotoContext pc=pendingPhoto;File f=pendingCameraFile;io.execute(()->{try{JSONObject m=mediaStore.registerCameraFile(f,pc.subsection,pc.visitDate,pc.ownerKind,pc.ownerId);m.put("target",pc.target);m.put("itemKey",pc.itemKey);m.put("requestId",pc.requestId);runOnUiThread(()->postJsString("window.receivePickedImage",m.toString()));}catch(Exception e){runOnUiThread(()->toast("ثبت تصویر دوربین ناموفق بود."));}});}else if(pendingCameraFile!=null&&!Boolean.TRUE.equals(ok))pendingCameraFile.delete();});backupPicker=registerForActivityResult(new ActivityResultContracts.OpenDocument(),uri->{if(uri!=null){pendingBackupUri=uri;io.execute(()->inspectBackup(uri));}});bridgePicker=registerForActivityResult(new ActivityResultContracts.OpenDocument(),uri->{if(uri!=null)io.execute(()->importBridgeFile(uri));});pdfDocumentLauncher=registerForActivityResult(new ActivityResultContracts.CreateDocument("application/pdf"),this::onExportDestination);csvDocumentLauncher=registerForActivityResult(new ActivityResultContracts.CreateDocument("text/csv"),this::onExportDestination);xlsxDocumentLauncher=registerForActivityResult(new ActivityResultContracts.CreateDocument("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),this::onExportDestination);backupDocumentLauncher=registerForActivityResult(new ActivityResultContracts.CreateDocument("application/zip"),this::onExportDestination);notificationPermission=registerForActivityResult(new ActivityResultContracts.RequestPermission(),granted->{if(!Boolean.TRUE.equals(granted))toast("مجوز اعلان داده نشد؛ یادآورها ممکن است نمایش داده نشوند.");});locationPermission=registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(),result->{boolean granted=Boolean.TRUE.equals(result.get(Manifest.permission.ACCESS_FINE_LOCATION))||Boolean.TRUE.equals(result.get(Manifest.permission.ACCESS_COARSE_LOCATION));if(granted)captureCurrentLocation(pendingLocationTarget);else postLocationError(pendingLocationTarget,"permission-denied");});}
     private void requestOccurrenceLocation(JSONObject p){
@@ -266,8 +382,8 @@ public final class MainActivity extends ComponentActivity {
     private void scheduleReminder(JSONObject p){long when=p.optLong("timestamp",0);if(when<=System.currentTimeMillis())return;if(Build.VERSION.SDK_INT>=33&&ContextCompat.checkSelfPermission(this,Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS);Intent i=new Intent(this,ReminderReceiver.class);int nid=Math.abs(p.optString("id","1").hashCode());i.putExtra("nid",nid);i.putExtra("title",bounded(p.optString("title"),140));i.putExtra("body",bounded(p.optString("body"),500));PendingIntent pi=PendingIntent.getBroadcast(this,nid,i,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);AlarmManager am=(AlarmManager)getSystemService(ALARM_SERVICE);if(am!=null){try{if(Build.VERSION.SDK_INT>=31&&am.canScheduleExactAlarms())am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,when,pi);else am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,when,pi);}catch(SecurityException e){am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,when,pi);}}}
     private void configureBack(){getOnBackPressedDispatcher().addCallback(this,new OnBackPressedCallback(true){@Override public void handleOnBackPressed(){if(webView==null||!pageReady){finish();return;}webView.evaluateJavascript("window.handleSystemBack?window.handleSystemBack():'exit'",value->{if("\"exit\"".equals(value)||"exit".equals(value))finish();});}});}
     private void applyImmersiveMode(){WindowInsetsControllerCompat c=WindowCompat.getInsetsController(getWindow(),getWindow().getDecorView());c.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);c.hide(WindowInsetsCompat.Type.systemBars());}
-    @Override protected void onResume(){super.onResume();applyImmersiveMode();DateStatusNotifier.show(this);if(Build.VERSION.SDK_INT>=33&&ContextCompat.checkSelfPermission(this,Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS);}@Override public void onWindowFocusChanged(boolean hasFocus){super.onWindowFocusChanged(hasFocus);if(hasFocus)applyImmersiveMode();}@Override protected void onDestroy(){io.shutdown();if(webView!=null){webView.stopLoading();webView.destroy();}if(db!=null)db.close();super.onDestroy();}
+    @Override protected void onResume(){super.onResume();applyImmersiveMode();DateStatusNotifier.show(this);if(pageReady&&webView!=null)webView.evaluateJavascript("window.Governance&&window.Governance.refreshAuthStatus(false)",null);if(Build.VERSION.SDK_INT>=33&&ContextCompat.checkSelfPermission(this,Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS);}@Override protected void onStop(){if(credentialManager!=null){try{credentialManager.lock();}catch(Exception ignored){}}super.onStop();}@Override public void onWindowFocusChanged(boolean hasFocus){super.onWindowFocusChanged(hasFocus);if(hasFocus)applyImmersiveMode();}@Override protected void onDestroy(){io.shutdown();if(webView!=null){webView.stopLoading();webView.destroy();}if(db!=null)db.close();super.onDestroy();}
     private void createNotificationChannel(){if(Build.VERSION.SDK_INT>=26){NotificationManager nm=(NotificationManager)getSystemService(NOTIFICATION_SERVICE);if(nm!=null)nm.createNotificationChannel(new NotificationChannel(ReminderReceiver.CHANNEL_ID,getString(R.string.notification_channel),NotificationManager.IMPORTANCE_DEFAULT));}}
-    private void postJsString(String fn,String arg){if(webView!=null)webView.evaluateJavascript(fn+"("+JSONObject.quote(arg)+")",null);}private void toast(String s){Toast.makeText(this,s,Toast.LENGTH_LONG).show();}private static boolean safeKind(String s){return s!=null&&s.matches("[A-Za-z0-9_\\-]{1,80}");}private static boolean safeId(String s){return s!=null&&s.length()>0&&s.length()<=180&&s.indexOf('\0')<0;}private static boolean validJson(String s){try{new JSONObject(s);return true;}catch(Exception e){return false;}}private static String mimeFor(String format){return"pdf".equals(format)?"application/pdf":"xlsx".equals(format)?"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":"zip".equals(format)?"application/zip":"text/csv";}private static String safeFileName(String name){String n=(name==null||name.trim().isEmpty())?"bridge-inspection-report.bin":name.trim();n=n.replaceAll("[\\\\/:*?\"<>|\\r\\n]","_");return n.length()>120?n.substring(0,120):n;}private static String bounded(String s,int n){if(s==null)return"";return s.length()>n?s.substring(0,n):s;}
+    private void postJsString(String fn,String arg){if(webView!=null)webView.evaluateJavascript(fn+"("+JSONObject.quote(arg)+")",null);}private void toast(String s){Toast.makeText(this,s,Toast.LENGTH_LONG).show();}private static boolean safeKind(String s){return BRIDGE_ENTITY_KINDS.contains(s);}private static boolean safeId(String s){return s!=null&&s.length()>0&&s.length()<=180&&s.indexOf('\0')<0;}private static boolean validJson(String s){try{new JSONObject(s);return true;}catch(Exception e){return false;}}private static String mimeFor(String format){return"pdf".equals(format)?"application/pdf":"xlsx".equals(format)?"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":"zip".equals(format)?"application/zip":"text/csv";}private static String safeFileName(String name){String n=(name==null||name.trim().isEmpty())?"bridge-inspection-report.bin":name.trim();n=n.replaceAll("[\\\\/:*?\"<>|\\r\\n]","_");return n.length()>120?n.substring(0,120):n;}private static String bounded(String s,int n){if(s==null)return"";return s.length()>n?s.substring(0,n):s;}
     private static final class PhotoContext{final String target,subsection,visitDate,ownerKind,ownerId,itemKey,requestId;PhotoContext(String target,String subsection,String visitDate,String ownerKind,String ownerId,String itemKey,String requestId){this.target=target;this.subsection=subsection;this.visitDate=visitDate;this.ownerKind=ownerKind;this.ownerId=ownerId;this.itemKey=itemKey;this.requestId=requestId;}static PhotoContext from(JSONObject p){return new PhotoContext(bounded(p.optString("target","inspection"),30),bounded(p.optString("subsection","تصویر"),80),bounded(p.optString("visitDate",""),20),bounded(p.optString("ownerKind","inspection"),40),bounded(p.optString("ownerId","pending"),180),bounded(p.optString("itemKey",""),180),bounded(p.optString("requestId",""),80));}}
 }

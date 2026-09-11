@@ -52,7 +52,7 @@ public class TransactionalFinalizerInstrumentationTest {
             JSONObject fin=new JSONObject(draft.toString()).put("status","نهایی").put("bridgeId","bridge-tx-2").put("updatedAt",2L)
                     .put("inspector","بازرس نمونه")
                     .put("items",new JSONArray().put(new JSONObject().put("itemId","steel-1").put("statusId","emergency")));
-            JSONObject audit=new JSONObject().put("id","aud-tx-2").put("kind","inspections").put("eid","ins-tx-2").put("updatedAt",2L);
+            JSONObject audit=new JSONObject().put("id","aud-tx-2").put("action","legacy-finalization-test").put("kind","inspections").put("eid","ins-tx-2").put("updatedAt",2L);
             boolean failed=false;
             try { TransactionalFinalizer.commit(db,fin,new JSONArray(),new JSONArray(),audit); }
             catch(IllegalArgumentException expected){ failed=true; }
@@ -70,7 +70,7 @@ public class TransactionalFinalizerInstrumentationTest {
                     .put("inspector","بازرس نمونه")
                     .put("signatureAttachment",new JSONObject().put("mediaId","signature-tx-3").put("signer","بازرس نمونه"))
                     .put("items",new JSONArray().put(new JSONObject().put("itemId","steel-1").put("statusId","emergency")));
-            JSONObject audit=new JSONObject().put("id","aud-tx-3").put("kind","inspections").put("eid","ins-tx-3").put("updatedAt",3L);
+            JSONObject audit=new JSONObject().put("id","aud-tx-3").put("action","legacy-finalization-test").put("kind","inspections").put("eid","ins-tx-3").put("updatedAt",3L);
             TransactionalFinalizer.commit(db,fin,new JSONArray(),new JSONArray(),audit);
             assertEquals("نهایی",find(db,"inspections","ins-tx-3").getString("status"));
             assertNotNull(find(db,"audit","aud-tx-3"));
@@ -83,7 +83,7 @@ public class TransactionalFinalizerInstrumentationTest {
             JSONObject fin=new JSONObject().put("id","ins-tx-4").put("status","نهایی").put("bridgeId","bridge-tx-4").put("updatedAt",4L)
                     .put("inspector","بازرس دوم")
                     .put("signatureAttachment",new JSONObject().put("mediaId","signature-tx-4").put("signer","بازرس اول"));
-            JSONObject audit=new JSONObject().put("id","aud-tx-4").put("kind","inspections").put("eid","ins-tx-4").put("updatedAt",4L);
+            JSONObject audit=new JSONObject().put("id","aud-tx-4").put("action","legacy-finalization-test").put("kind","inspections").put("eid","ins-tx-4").put("updatedAt",4L);
             boolean rejected=false;try{TransactionalFinalizer.commit(db,fin,new JSONArray(),new JSONArray(),audit);}catch(IllegalArgumentException expected){rejected=true;}
             assertTrue(rejected);assertNull(find(db,"inspections","ins-tx-4"));assertNull(find(db,"audit","aud-tx-4"));
         }

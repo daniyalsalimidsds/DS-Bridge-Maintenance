@@ -33,6 +33,15 @@ public class ReportExportInstrumentationTest {
 
     @Test public void csvAndStyledThreeSheetXlsxSeparateReportBridgeAndGroupedChecklist() throws Exception {
         Context context=ApplicationProvider.getApplicationContext();ReportExporter exporter=new ReportExporter(context);JSONObject payload=sample(8);
+        payload.put("records",new JSONArray().put(new JSONObject().put("id","inspection-governed").put("reportNo","B-20260910-001")
+                .put("inspector","بازرس نمونه").put("inspectorId","inspector-1").put("fieldHash","abc123")
+                .put("qcReviewer","بازبین مستقل").put("qcReviewerId","reviewer-1").put("qcComment","تأیید مستقل شواهد")));
+        payload.put("criticalFindings",new JSONArray().put(new JSONObject().put("id","critical-1")
+                .put("inspectionId","inspection-governed").put("itemCode","1.1").put("title","ناپایداری عضو")
+                .put("status","open").put("immediateAction","انسداد و ایمن‌سازی محدوده")
+                .put("operatingRestriction","closure").put("restrictionRationale","خطر فوری")
+                .put("notifiedContact","مرکز کنترل").put("notifiedAt","2026-09-10T10:00:00Z")
+                .put("ownerId","inspector-1").put("dueAt","2026-09-10T12:00:00Z")));
         payload.getJSONArray("rows").put(new JSONArray().put("=2+2").put("@SUM(A1:A2)"));
         File csv=exporter.create("csv","bridge-report.csv",payload);String text=new String(read(csv),StandardCharsets.UTF_8);
         assertTrue(text.startsWith("\ufeff"));assertTrue(text.contains("مشخصات پل"));assertTrue(text.contains("موقعیت مکانی"));assertTrue(text.contains("35.689200, 51.389000"));assertFalse(text.contains("\"۱۴۰۵/۰۵/۲۰\""));assertFalse(text.contains("اقدام / مسئول"));assertTrue(text.contains("'=2+2"));assertTrue(text.contains("../photos/"));
@@ -43,6 +52,7 @@ public class ReportExportInstrumentationTest {
             String profileXml=new String(read(zip.getInputStream(zip.getEntry("xl/worksheets/sheet2.xml"))),StandardCharsets.UTF_8);
             String checklistXml=new String(read(zip.getInputStream(zip.getEntry("xl/worksheets/sheet3.xml"))),StandardCharsets.UTF_8);
             assertTrue(reportXml.contains("مشخصات گزارش"));assertTrue(reportXml.contains("نام بازرس"));assertTrue(reportXml.contains("بازرس نمونه"));
+            assertTrue(reportXml.contains("زنجیره هویت و تأیید"));assertTrue(reportXml.contains("پرونده‌های یافته بحرانی"));assertTrue(reportXml.contains("انسداد و ایمن‌سازی محدوده"));
             assertTrue(profileXml.contains("rightToLeft=\"1\""));assertTrue(profileXml.contains("موقعیت مکانی"));assertTrue(profileXml.contains("35.689200, 51.389000"));
             assertTrue(checklistXml.contains("rightToLeft=\"1\""));assertTrue(checklistXml.contains("customWidth=\"1\""));assertTrue(checklistXml.contains("customHeight=\"1\""));assertTrue(checklistXml.contains("HYPERLINK"));assertFalse(checklistXml.contains("تاریخ"));assertFalse(checklistXml.contains("۱۴۰۵/۰۵/۲۰"));assertFalse(checklistXml.contains("اقدام / مسئول"));assertFalse(checklistXml.contains("شماره گزارش"));assertFalse(checklistXml.contains(">بازرس<"));
             String workbook=new String(read(zip.getInputStream(zip.getEntry("xl/workbook.xml"))),StandardCharsets.UTF_8);assertTrue(workbook.contains("مشخصات گزارش"));assertTrue(workbook.contains("مشخصات پل"));assertTrue(workbook.contains("چک‌لیست بازرسی"));
@@ -57,10 +67,16 @@ public class ReportExportInstrumentationTest {
             JSONObject signature=media.saveSignatureDataUri(png,"بازرس نمونه","۱۴۰۵/۰۵/۲۰","ins-zip-1");
             JSONObject bridge=new JSONObject().put("id","bridge-1").put("name","پل آزادی").put("code","BR-01").put("use","راه").put("profile",new JSONObject().put("name","پل آزادی"));
             JSONObject record=new JSONObject().put("id","ins-zip-1").put("no","B-ZIP-1").put("jdate","۱۴۰۵/۰۵/۲۰").put("bridgeId","bridge-1").put("bridgeName","پل آزادی").put("bridgeCode","BR-01").put("signatureAttachment",signature).put("items",new JSONArray().put(new JSONObject().put("itemId","concrete-1").put("itemCode","2").put("occurrenceIndex",1).put("code","2.1").put("location",new JSONObject().put("lat",35.6892).put("lon",51.389).put("accuracyM",7.5)).put("photos",new JSONArray().put(photo))));
-            JSONObject payload=sample(2).put("records",new JSONArray().put(record)).put("bridges",new JSONArray().put(bridge)).put("profileSchema",new JSONObject().put("version","367-menu-profile-v1")).put("engineeringReferences",new JSONObject().put("iran","نشریه ۳۶۷"));
+            JSONObject critical=new JSONObject().put("id","critical-zip-1").put("inspectionId","ins-zip-1").put("itemCode","2.1")
+                    .put("title","یافته بحرانی نمونه").put("status","closed").put("immediateAction","ایمن‌سازی فوری")
+                    .put("operatingRestriction","closure").put("restrictionRationale","خطر فوری")
+                    .put("notifiedContact","مرکز کنترل").put("notifiedAt","2026-09-10T10:00:00Z")
+                    .put("ownerId","inspector-1").put("dueAt","2026-09-10T12:00:00Z");
+            JSONObject payload=sample(2).put("records",new JSONArray().put(record)).put("criticalFindings",new JSONArray().put(critical)).put("bridges",new JSONArray().put(bridge)).put("profileSchema",new JSONObject().put("version","367-menu-profile-v1")).put("engineeringReferences",new JSONObject().put("iran","نشریه ۳۶۷"));
             File bundle=new ReportExporter(context,media).create("zip","complete.zip",payload);assertTrue(bundle.isFile());
             try(ZipFile zip=new ZipFile(bundle)){
-                for(String path:new String[]{"report/bridge-inspection-report.pdf","report/bridge-inspection-report.xlsx","report/bridge-inspection-report.csv","data/inspections.json","data/bridges.json","data/bridge-profile-schema.json","data/engineering-references.json"})assertNotNull(path,zip.getEntry(path));
+                for(String path:new String[]{"report/bridge-inspection-report.pdf","report/bridge-inspection-report.xlsx","report/bridge-inspection-report.csv","data/inspections.json","data/critical-findings.json","data/bridges.json","data/bridge-profile-schema.json","data/engineering-references.json"})assertNotNull(path,zip.getEntry(path));
+                assertTrue(new String(read(zip.getInputStream(zip.getEntry("data/critical-findings.json"))),StandardCharsets.UTF_8).contains("ایمن‌سازی فوری"));
                 assertTrue(zip.stream().anyMatch(entry->entry.getName().startsWith("photos/B-ZIP-1_")&&entry.getName().contains("/2.1/")));
                 assertTrue(zip.stream().anyMatch(entry->entry.getName().startsWith("امضا/B-ZIP-1_")&&entry.getName().endsWith(".png")));
             }

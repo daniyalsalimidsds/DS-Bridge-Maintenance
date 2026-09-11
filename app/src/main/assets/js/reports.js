@@ -64,9 +64,9 @@
     return { category: '', item: itemId || '' };
   }
   function severitySort(a, b) {
-    const rank = { emergency: 0, uninspectable: 1, medium: 2, low: 3, none: 4 };
-    const ar = rank[severityId(a?.statusId || a?.status || 'none')] ?? 3;
-    const br = rank[severityId(b?.statusId || b?.status || 'none')] ?? 3;
+    const rank = { unknown: -1, emergency: 0, uninspectable: 1, medium: 2, low: 3, none: 4 };
+    const ar = rank[severityId(a?.statusId || a?.status || 'none')] ?? -1;
+    const br = rank[severityId(b?.statusId || b?.status || 'none')] ?? -1;
     return ar - br || compareCodes(itemOccurrenceCode(a), itemOccurrenceCode(b));
   }
 
@@ -106,6 +106,8 @@
     const bridgeCodes = [...new Set((records || []).map(record => record.bridgeCode || bridgeCode(bridgeForRecord(record))).filter(Boolean))];
     const bridgeUses = [...new Set((records || []).map(record => record.bridgeUse || bridgeUse(bridgeForRecord(record))).filter(Boolean))];
     const visitTypes = [...new Set((records || []).map(record => String(record.visitType || '').trim()).filter(Boolean))];
+    const reportNumbers = [...new Set((records || []).map(record => String(record.reportNo || record.no || '').trim()).filter(Boolean))];
+    const reviewers = [...new Set((records || []).map(record => String(record.qcReviewer || '').trim()).filter(Boolean))];
     const generatedJ = typeof nowDates === 'function' && typeof jfmt === 'function' ? jfmt(nowDates().j) : '';
     const damaged = counts.emergency + counts.medium + counts.low;
     return [
@@ -117,6 +119,8 @@
       ['کاربری پل', bridgeUses.join('، ')],
       ['نوع بازدید', visitTypes.join('، ')],
       ['تعداد بازدیدهای گزارش', String((records || []).length)],
+      ['شماره‌های رسمی گزارش', reportNumbers.join('، ')],
+      ['بازبین مستقل QC', reviewers.join('، ') || 'سابقه میراثی؛ ثبت نشده'],
       ['کل موارد دارای آسیب', String(damaged)],
       ['آسیب اضطراری', String(counts.emergency)],
       ['آسیب متوسط', String(counts.medium)],
@@ -215,6 +219,8 @@
       if (bridge?.id && !seen.has(bridge.id)) { seen.add(bridge.id); bridges.push(bridge); }
     });
     const reportRows = reportRowsFor(records, settings), profileRows = profileRowsFor(records);
+    const inspectionIds = new Set((records || []).map(record => record.id));
+    const criticalFindings = dbList('criticalFindings').filter(item => inspectionIds.has(item.inspectionId));
     return {
       meta: {
         organization: settings.orgName || 'شرکت مهندسین مشاور هگزا', unit: settings.unitName || '',
@@ -224,14 +230,16 @@
         profileSource: window.BRIDGE_PROFILE_SCHEMA?.source || '', profileSourceSha256: window.BRIDGE_PROFILE_SCHEMA?.sourceSha256 || '',
       },
       reportRows, profileRows, rows: groupedRows(records, CORE_HEADERS), pdfRows: groupedRows(records, PDF_HEADERS),
-      records: records || [], bridges, profileSchema: window.BRIDGE_PROFILE_SCHEMA || {},
+      records: records || [], criticalFindings, bridges, profileSchema: window.BRIDGE_PROFILE_SCHEMA || {},
       engineeringReferences: {...(window.BRIDGE_ENGINEERING_REFERENCES || {}), municipal:window.BRIDGE_MUNICIPAL_CATALOG?.sourceSha256,snbi:'https://www.fhwa.dot.gov/bridge/snbi/snbi_march_2022_publication.pdf'},
     };
   }
 
   function exportNative(format, records, filename) {
     if (!records?.length) { toast('رکوردی برای خروجی وجود ندارد.'); return; }
-    const report = reportPayload(records);
+    const official = records.filter(record => window.isOfficialInspection?.(record));
+    if (official.length !== records.length) { toast('خروجی رسمی فقط برای گزارش تأییدشده و باطل‌نشده مجاز است.'); return; }
+    const report = reportPayload(official);
     if (Native?.isNative?.()) {
       Native.exportReport(format, filename, report);
       toast(format === 'zip' ? 'در حال آماده‌سازی بسته ZIP کامل…' : 'پنجره ذخیره فایل باز می‌شود.');
@@ -248,12 +256,12 @@
   window.makeXLSX = (records, filename) => exportNative('xlsx', records, filename || 'bridge-inspection-report.xlsx');
   window.makePDF = (records, filename) => exportNative('pdf', records, filename || 'bridge-inspection-report.pdf');
   window.makeZIP = (records, filename) => exportNative('zip', records, filename || 'bridge-inspection-complete.zip');
-  window.exportSingleInspection = recordId => { closeModal('genericModal'); const record = dbList('inspections').find(item => item.id === recordId); if (record) makePDF([record], `${record.no || 'bridge-inspection'}.pdf`); };
-  window.exportSingleInspectionZip = recordId => { closeModal('genericModal'); const record = dbList('inspections').find(item => item.id === recordId); if (record) makeZIP([record], `${record.no || 'bridge-inspection'}-complete.zip`); };
+  window.exportSingleInspection = recordId => { closeModal('genericModal'); const record = dbList('inspections').find(item => item.id === recordId); if (window.isOfficialInspection?.(record)) makePDF([record], `${record.no || 'bridge-inspection'}.pdf`); else toast('این رکورد گزارش رسمی معتبر نیست.'); };
+  window.exportSingleInspectionZip = recordId => { closeModal('genericModal'); const record = dbList('inspections').find(item => item.id === recordId); if (window.isOfficialInspection?.(record)) makeZIP([record], `${record.no || 'bridge-inspection'}-complete.zip`); else toast('این رکورد گزارش رسمی معتبر نیست.'); };
   window.exportHistoryZip = () => {
     const records = typeof filteredInspectionRecords === 'function'
-      ? filteredInspectionRecords().filter(item => item.status === 'نهایی')
-      : dbList('inspections').filter(item => !item.archived && item.status === 'نهایی');
+      ? filteredInspectionRecords().filter(item => window.isOfficialInspection?.(item))
+      : dbList('inspections').filter(item => !item.archived && window.isOfficialInspection?.(item));
     makeZIP(records, 'bridge-inspection-history.zip');
   };
 })();

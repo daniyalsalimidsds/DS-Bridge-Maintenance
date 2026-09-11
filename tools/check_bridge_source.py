@@ -91,7 +91,7 @@ def main() -> None:
         require(token in checklist, f"fine-grained dynamic checklist rule is missing: {token}")
     for token in ["VERSIONED_ITEM_CATEGORY_IDS", "LEGACY_V11_CATEGORIES", "bridgeLegacyChecklistDefinition"]:
         require(token in checklist, f"v1.1 checklist compatibility guard is missing: {token}")
-    require("checklistSchemaVersion: '1.6.0'" in core, "new inspections must carry a checklist schema version")
+    require("checklistSchemaVersion: '1.7.0'" in core, "new inspections must carry a checklist schema version")
     require("scheduleMarqueeRefresh" in core, "responsive checklist Marquee refresh is missing")
     require("signatureAttachment" in finalizer and "Inspector signature is required" in finalizer, "native finalizer must require the inspector signature")
     require("does not match signature signer" in finalizer, "manual inspector/signature consistency check is missing")

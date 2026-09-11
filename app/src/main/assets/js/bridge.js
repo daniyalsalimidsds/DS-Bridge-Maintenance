@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  const store = Object.create(null); const readyCallbacks = []; const mutationWaiters = new Map(); let ready = false; let versionName = 'web-dev'; let versionCode = 0; let mutationSequence = 0;
+  const store = Object.create(null); const readyCallbacks = []; const mutationWaiters = new Map(); const requestWaiters = new Map(); let ready = false; let versionName = 'web-dev'; let versionCode = 0; let mutationSequence = 0;
   function cloneList(kind){return Array.isArray(store[kind])?store[kind]:[];}
   function send(type,payload){try{if(window.BridgeNative&&typeof window.BridgeNative.postMessage==='function'){window.BridgeNative.postMessage(JSON.stringify({type,payload:payload||{}}));return true;}}catch(e){console.error('Native bridge message failed',type,e);}return false;}
   function sendTransfer(type,payload){try{if(window.BridgeTransferNative&&typeof window.BridgeTransferNative.postMessage==='function'){window.BridgeTransferNative.postMessage(JSON.stringify({type,payload:payload||{}}));return true;}}catch(e){console.error('Bridge transfer failed',type,e);}return false;}
@@ -46,7 +46,21 @@
       if(!primarySent&&!transferSent){clearTimeout(timer);mutationWaiters.delete(requestId);resolve({ok:false,error:'bridge-unavailable'});}
     });
   }
-  function hydrateFallback(){const kinds=window.ENTITY_KINDS||['users','bridges','standards','inspections','defects','audit','settings','reminders'];kinds.forEach(kind=>{try{store[kind]=JSON.parse(localStorage.getItem('bridge_'+kind)||localStorage.getItem('rail_'+kind)||'[]');}catch(_){store[kind]=[];}});}
+  function applyEntityPatches(patches){Object.entries(patches||{}).forEach(([kind,rows])=>{if(!Array.isArray(rows))return;rows.forEach(row=>{if(row?.id!=null)saveLocal(kind,row);});});document.dispatchEvent(new CustomEvent('bridge-governed-entities',{detail:{entities:patches||{}}}));}
+  function request(type,payload={}){
+    const native=!!(window.BridgeNative&&typeof window.BridgeNative.postMessage==='function');
+    if(!native){
+      const handler=window.BridgeFallbackHandlers?.[type];
+      return Promise.resolve().then(()=>typeof handler==='function'?handler(payload):{ok:false,error:'native-required'}).then(result=>{if(result?.entities)applyEntityPatches(result.entities);return result;});
+    }
+    const requestId='req-'+Date.now().toString(36)+'-'+(++mutationSequence).toString(36);
+    return new Promise(resolve=>{
+      const timer=setTimeout(()=>{requestWaiters.delete(requestId);resolve({ok:false,error:'native-timeout'});},45000);
+      requestWaiters.set(requestId,{resolve,timer});
+      if(!send(type,{...payload,requestId})){clearTimeout(timer);requestWaiters.delete(requestId);resolve({ok:false,error:'bridge-unavailable'});}
+    });
+  }
+  function hydrateFallback(){const kinds=window.ENTITY_KINDS||['users','bridges','standards','inspections','defects','audit','settings','reminders','reviews','criticalFindings','inspectionVoids','reportRevisions','inspectionPrograms'];kinds.forEach(kind=>{try{store[kind]=JSON.parse(localStorage.getItem('bridge_'+kind)||localStorage.getItem('rail_'+kind)||'[]');}catch(_){store[kind]=[];}});}
   function fireReady(){if(ready)return;ready=true;while(readyCallbacks.length){const cb=readyCallbacks.shift();try{cb();}catch(e){console.error('bridge-ready callback failed',e);}}document.dispatchEvent(new CustomEvent('bridge-ready'));}
   window.onRailReady=function(callback){if(typeof callback!=='function')return;if(ready)setTimeout(callback,0);else readyCallbacks.push(callback);};
   window.BridgeNativeClient={
@@ -55,6 +69,20 @@
     dbSave(kind,id,json){let obj;try{obj=JSON.parse(json);}catch(_){return false;}saveLocal(kind,obj);return send('dbSave',{kind:String(kind),id:String(id),json:JSON.stringify(obj)});},
     dbDelete(kind,id){return deleteBatch([{kind,id}]);},
     dbDeleteBatch(entries){return deleteBatch(entries);},
+    request(type,payload){return request(type,payload||{});},
+    authStatus(){return request('authStatus',{});},
+    authenticate(userId,pin){return request('authenticate',{userId,pin});},
+    enrollPin(userId,pin){return request('enrollPin',{userId,pin});},
+    lockSession(){return request('lockSession',{});},
+    submitInspection(bundle){return request('submitInspection',bundle||{});},
+    reviewInspection(payload){return request('reviewInspection',payload||{});},
+    voidInspection(payload){return request('voidInspection',payload||{});},
+    createCorrectionDraft(payload){return request('createCorrectionDraft',payload||{});},
+    saveInspectionProgram(program){return request('saveInspectionProgram',{program});},
+    updateCriticalFinding(payload){return request('updateCriticalFinding',payload||{});},
+    saveGovernedUser(user){return request('saveGovernedUser',{user});},
+    deactivateGovernedUser(userId,reason){return request('deactivateGovernedUser',{userId,reason});},
+    appendAudit(payload){return request('appendAudit',payload||{});},
     finalizeInspection(inspection,defects,reminders,audit){return send('finalizeInspection',{inspection,defects:defects||[],reminders:reminders||[],audit});},
     pickImage(payload){return send('pickImage',payload||{});},takePhoto(payload){return send('takePhoto',payload||{});},requestLocation(payload){return send('requestLocation',payload||{});},openLocationSettings(){return send('openLocationSettings',{});},saveSignature(payload){return send('saveSignature',payload||{});},pickBackup(){return send('pickBackup',{});},pickBridge(){return sendTransfer('pickBridge',{});},exportBridge(bridge){return sendTransfer('exportBridge',{bridge});},scheduleReminder(id,timestamp,title,body){return send('scheduleReminder',{id,timestamp,title,body});},exportReport(format,name,report){return send('exportReport',{format,name,report});},exportBackup(){return send('exportBackup',{});},restorePendingBackup(){return send('restorePendingBackup',{});},appVersion(){return versionName+' ('+versionCode+')';},isNative(){return !!(window.BridgeNative&&typeof window.BridgeNative.postMessage==='function');}
   };
@@ -64,6 +92,7 @@
   window.dbDelete=(kind,id)=>window.BridgeNativeClient.dbDelete(kind,String(id));
   window.dbDeleteBatch=entries=>window.BridgeNativeClient.dbDeleteBatch(entries);
   window.receiveDbDeleteResult=function(raw){let result={ok:false};try{result=typeof raw==='string'?JSON.parse(raw):raw||result;}catch(_){}const requestId=String(result.requestId||''),waiter=mutationWaiters.get(requestId);if(!waiter)return;clearTimeout(waiter.timer);mutationWaiters.delete(requestId);if(result.ok){waiter.entries.forEach(x=>deleteLocal(x.kind,x.id));document.dispatchEvent(new CustomEvent('bridge-entities-deleted',{detail:{entries:waiter.entries}}));}waiter.resolve(result);};
+  window.receiveNativeRequestResult=function(raw){let result={ok:false,error:'invalid-native-response'};try{result=typeof raw==='string'?JSON.parse(raw):raw||result;}catch(_){}const requestId=String(result.requestId||''),waiter=requestWaiters.get(requestId);if(!waiter)return;clearTimeout(waiter.timer);requestWaiters.delete(requestId);if(result.ok&&result.entities)applyEntityPatches(result.entities);waiter.resolve(result);};
   window.receiveFinalizeResult=function(raw){let r={ok:false};try{r=typeof raw==='string'?JSON.parse(raw):raw||r;}catch(_){}const pending=window.pendingFinalization;if(r.ok&&pending){saveLocal('inspections',pending.inspection);(pending.defects||[]).forEach(x=>saveLocal('defects',x));(pending.reminders||[]).forEach(x=>saveLocal('reminders',x));if(pending.audit)saveLocal('audit',pending.audit);window.setCurrentInspection?.(pending.inspection);window.currentInspection=pending.inspection;window.setFinalizationPending?.(false);window.pendingFinalization=null;document.dispatchEvent(new CustomEvent('bridge-finalization-committed',{detail:{inspection:pending.inspection}}));if(typeof toast==='function')toast('بازدید با موفقیت نهایی شد');if(typeof go==='function')go('dashboard');}else{window.setFinalizationPending?.(false);window.pendingFinalization=null;if(typeof toast==='function')toast('نهایی‌سازی بازدید انجام نشد؛ پیش‌نویس شما حفظ شد.');}};
   window.addEventListener('load',()=>{setTimeout(()=>{if(!ready&&!window.BridgeNativeClient.isNative()){hydrateFallback();fireReady();}},25);},{once:true});
   const resilience=document.createElement('script');resilience.src='js/resilience.js';resilience.defer=true;document.head.appendChild(resilience);

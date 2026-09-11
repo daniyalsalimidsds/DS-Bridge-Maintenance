@@ -20,6 +20,8 @@
     try {
       if (p==='dashboard') renderDashboard(); else if (p==='bridges') renderBridges(); else if (p==='drafts') renderDrafts(); else if (p==='inspections') renderInspections(); else if (p==='defects') renderDefects();
       else if (p==='reports') renderReportStats(); else if (p==='users') renderUsers();
+      else if (p==='reviews') window.renderReviews?.(); else if (p==='criticalFindings') window.renderCriticalFindings?.();
+      else if (p==='programs') window.renderPrograms?.();
       else if (p==='master') masterTab();
       else if (p==='settings') loadSettings();
       else if(p==='academy') window.renderAcademy?.();
@@ -31,7 +33,7 @@
     if(current==='inspectionForm' && p!==current)window.flushInspectionAutosave?.();
     document.querySelectorAll('.page').forEach(x => x.classList.remove('active'));
     el.classList.add('active');
-    const fab=document.querySelector('.fab');if(fab)fab.hidden=['academy','guide','inspectionForm','bridgeForm'].includes(p);
+    const fab=document.querySelector('.fab');if(fab)fab.hidden=['academy','guide','inspectionForm','bridgeForm','reviews','criticalFindings','programs','users'].includes(p);
     const title = document.getElementById('pageTitle'); if (title) title.textContent = (window.pageNames || {})[p] || '';
     closeDrawers(); closeOpenSheetsExcept(null);
     const main = document.querySelector('main'); if (main) main.scrollTo({top:0, behavior:'auto'});

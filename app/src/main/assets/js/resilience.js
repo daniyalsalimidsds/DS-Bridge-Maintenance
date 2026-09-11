@@ -12,7 +12,7 @@
     const base = window.currentInspection;
     const bridge = window.selectedInspectionBridge?.();
     if (document.querySelector('.page.active')?.id !== 'inspectionForm') return null;
-    if (finalizationPending || !base || !bridge || base.status === 'نهایی' || base.finalizedAt) return null;
+    if (finalizationPending || !base || !bridge || ['submitted','approved'].includes(base.workflowStatus) || base.status === 'نهایی' || base.finalizedAt) return null;
     window.captureEngineeringAssessment?.();
     const items = typeof window.collectInspectionItems === 'function' ? window.collectInspectionItems() : [];
     if (typeof window.checklistHasEnteredData === 'function' && !window.checklistHasEnteredData(items) && !base.signatureAttachment && !base.internationalAssessment?.reviewer && !base.elementAssessments?.length) {
@@ -42,13 +42,14 @@
       bridgeSnapshot: JSON.parse(JSON.stringify(bridge)),
       visitType: val('visitType'),
       shift: val('shift'),
-      inspector: val('inspectorName'),
-      inspectorId: '',
+      inspector: window.getActiveUser?.()?.name || val('inspectorName'),
+      inspectorId: window.getActiveUser?.()?.id || base.inspectorId || '',
       items,
       overall,
       overallLabel: overallResult.label,
       photos: [...(window.currentPhotos || [])],
       status: 'پیش‌نویس',
+      workflowStatus: base.workflowStatus === 'returned' ? 'returned' : 'draft',
       draftAutoSavedAt: Date.now(),
       updatedAt: Date.now(),
     };

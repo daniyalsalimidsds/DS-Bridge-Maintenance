@@ -7,6 +7,7 @@ import android.os.SystemClock;
 import android.webkit.WebView;
 
 import androidx.test.core.app.ActivityScenario;
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.uiautomator.UiDevice;
@@ -22,8 +23,10 @@ import java.util.concurrent.atomic.AtomicReference;
 public class GestureInstrumentationTest {
     @Test
     public void physicalHorizontalSwipesOpenAndCloseDrawersFromPageContent() throws Exception {
+        freshDatabase();
         try (ActivityScenario<MainActivity> s = ActivityScenario.launch(MainActivity.class)) {
             waitForWebAppReady(s);
+            authenticateAdmin(s);
             UiDevice d = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
             d.waitForIdle();
             eval(s, "closeDrawers();'ok'");
@@ -51,8 +54,10 @@ public class GestureInstrumentationTest {
 
     @Test
     public void verticalAndSystemTopEdgeDoNotOpenAppDrawer() throws Exception {
+        freshDatabase();
         try (ActivityScenario<MainActivity> s = ActivityScenario.launch(MainActivity.class)) {
             waitForWebAppReady(s);
+            authenticateAdmin(s);
             eval(s, "closeDrawers();'ok'");
             UiDevice d = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
             d.waitForIdle();
@@ -68,8 +73,10 @@ public class GestureInstrumentationTest {
 
     @Test
     public void newInspectionCategoriesAreCollapsedAndToggle() throws Exception {
+        freshDatabase();
         try (ActivityScenario<MainActivity> s = ActivityScenario.launch(MainActivity.class)) {
             waitForWebAppReady(s);
+            authenticateAdmin(s);
             seedBridge(s);eval(s, "newInspection('qa-bridge');'started'");
             assertEquals("present", waitForValue(s,
                     "document.querySelector('#checklistHost .checkcat')?'present':'missing'",
@@ -91,8 +98,10 @@ public class GestureInstrumentationTest {
 
     @Test
     public void checklistOrderUsesNumericCodes() throws Exception {
+        freshDatabase();
         try (ActivityScenario<MainActivity> s = ActivityScenario.launch(MainActivity.class)) {
             waitForWebAppReady(s);
+            authenticateAdmin(s);
             seedBridge(s);eval(s, "newInspection('qa-bridge');'started'");
             assertEquals("expanded",eval(s,"(()=>{const button=document.querySelector('#checklistHost .checkcat-title');if(!button)return 'missing';button.click();return button.getAttribute('aria-expanded')==='true'?'expanded':'bad'})()"));
             assertEquals("present", waitForValue(s,
@@ -106,8 +115,10 @@ public class GestureInstrumentationTest {
 
     @Test
     public void physicalBottomSheetDragClosesSheet() throws Exception {
+        freshDatabase();
         try (ActivityScenario<MainActivity> s = ActivityScenario.launch(MainActivity.class)) {
             waitForWebAppReady(s);
+            authenticateAdmin(s);
             eval(s, "showGeneric('آزمون','<p>gesture</p>',[]);'ok'");
             assertEquals("visible",waitForValue(s,"(()=>{const r=document.querySelector('#genericModal .sheet').getBoundingClientRect();return r.top>=0&&r.top<innerHeight&&r.bottom<=innerHeight+1?'visible':'outside'})()","visible",2_000));
             eval(s, "window.__qaSheetEvents=[];['touchstart','touchmove','touchend','touchcancel','pointerdown','pointermove','pointerup','pointercancel'].forEach(t=>document.addEventListener(t,e=>{const p=e.touches?.[0]||e.changedTouches?.[0]||e;window.__qaSheetEvents.push(t+':'+Math.round(p.clientX)+','+Math.round(p.clientY));},{capture:true,passive:true}));'armed'");
@@ -133,7 +144,8 @@ public class GestureInstrumentationTest {
                 "window.BridgeNativeClient.appVersion().indexOf('1.6.0')===0&&" +
                 "typeof window.newInspection==='function'&&typeof window.openDrawer==='function'&&" +
                 "typeof window.closeDrawers==='function'&&typeof window.compareChecklistCodes==='function'&&" +
-                "typeof window.initSwipeNavigation==='function'&&window.initSwipeNavigation._done===true?" +
+                "typeof window.initSwipeNavigation==='function'&&window.initSwipeNavigation._done===true&&" +
+                "window.Governance?.initialized===true?" +
                 "'ready':'wait'}catch(e){return 'wait'}})()";
         assertEquals("ready", waitForValue(s, readyJs, "ready", 30_000));
         SystemClock.sleep(250);
@@ -141,6 +153,15 @@ public class GestureInstrumentationTest {
 
     private static void seedBridge(ActivityScenario<MainActivity> s) throws Exception {
         eval(s,"(()=>{const fs=BRIDGE_PROFILE_SCHEMA.sections.flatMap(x=>x.fields),fid=l=>fs.find(x=>x.label===l).id,b={id:'qa-bridge',name:'پل آزمون',code:'QA-01',use:'راه',profile:{}};b.profile[fid('نام پل')]=b.name;b.profile[fid('کد پل')]=b.code;b.profile[fid('کاربری اصلی')]=b.use;b.profile[fid('مصالح اَبَرسازه')]='بتن درجا - بتن مسلح';b.profile[fid('نوع روسازی')]='آسفالت';dbSave('bridges',b);return 'ok'})()");
+    }
+
+    private static void authenticateAdmin(ActivityScenario<MainActivity> s) throws Exception {
+        assertEquals("started", eval(s, "(()=>{window.__qaAuth='wait';document.getElementById('authPin').value='135790';document.getElementById('authPinConfirm').value='135790';submitAuthentication().then(()=>window.__qaAuth=Governance.currentUser()?.id||'failed').catch(()=>window.__qaAuth='failed');return 'started'})()"));
+        assertEquals("user-admin", waitForValue(s, "window.__qaAuth||'wait'", "user-admin", 10_000));
+    }
+
+    private static void freshDatabase() {
+        ApplicationProvider.getApplicationContext().deleteDatabase(AppDb.DB_NAME);
     }
 
     private static String drawerStateJs() {

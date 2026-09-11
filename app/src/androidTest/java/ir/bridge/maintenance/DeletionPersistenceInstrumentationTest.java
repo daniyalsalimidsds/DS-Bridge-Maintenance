@@ -6,6 +6,7 @@ import static org.junit.Assert.assertTrue;
 import android.os.SystemClock;
 import android.webkit.WebView;
 import androidx.test.core.app.ActivityScenario;
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -18,22 +19,38 @@ import java.util.concurrent.atomic.AtomicReference;
  * update cannot make a failed SQLite delete look successful. */
 @RunWith(AndroidJUnit4.class)
 public class DeletionPersistenceInstrumentationTest {
-    @Test public void directDeleteIsPersistedAcrossActivityRestart() throws Exception {
-        String id = "qa-v150-delete-" + System.currentTimeMillis();
+    @Test public void unauthenticatedNativeMutationIsRejectedAcrossRestart() throws Exception {
+        ApplicationProvider.getApplicationContext().deleteDatabase(AppDb.DB_NAME);
+        String id = "qa-v170-unauthorized-" + System.currentTimeMillis();
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
             waitReady(scenario);
-            assertEquals("ready", eval(scenario, "typeof BridgeAndroid?.deleteBatch==='function'?'ready':'missing'"));
-            eval(scenario, "(()=>{dbSave('bridges',{id:'" + id + "-bridge',name:'پل حذف مستقیم',code:'QA-DEL',profile:{}});dbSave('inspections',{id:'" + id + "-inspection',status:'پیش‌نویس',bridgeId:'" + id + "-bridge'});dbSave('defects',{id:'" + id + "-defect',inspectionId:'" + id + "-inspection'});dbSave('reminders',{id:'" + id + "-reminder',ownerId:'" + id + "-inspection'});dbSave('audit',{id:'" + id + "-audit',eid:'" + id + "-inspection'});return 'saved'})()");
-            // dbSave uses the WebMessage write path; allow its transaction to
-            // reach SQLite before exercising the synchronous delete endpoint.
+            assertEquals("sent", eval(scenario, "(()=>{dbSave('bridges',{id:'" + id + "',name:'نباید ذخیره شود',code:'DENY'});return 'sent'})()"));
             SystemClock.sleep(700);
-            assertEquals("started", eval(scenario, "(()=>{dbDeleteBatch([{kind:'bridges',id:'" + id + "-bridge'},{kind:'inspections',id:'" + id + "-inspection'},{kind:'defects',id:'" + id + "-defect'},{kind:'reminders',id:'" + id + "-reminder'},{kind:'audit',id:'" + id + "-audit'}]).then(r=>window.__qaDeleteResult=r.ok?'ok':'bad');return 'started'})()"));
-            assertEquals("ok", waitForValue(scenario, "window.__qaDeleteResult||'wait'", "ok", 5000));
-            assertEquals("gone", eval(scenario, "['bridges','inspections','defects','reminders','audit'].every(k=>!dbList(k).some(x=>String(x.id).startsWith('" + id + "-')))?'gone':'present'"));
         }
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
             waitReady(scenario);
-            assertEquals("gone", eval(scenario, "['bridges','inspections','defects','reminders','audit'].every(k=>!dbList(k).some(x=>String(x.id).startsWith('" + id + "-')))?'gone':'present'"));
+            assertEquals("absent", eval(scenario, "dbList('bridges').some(x=>x.id==='" + id + "')?'present':'absent'"));
+        }
+    }
+
+    @Test public void directDeleteIsPersistedAcrossActivityRestart() throws Exception {
+        ApplicationProvider.getApplicationContext().deleteDatabase(AppDb.DB_NAME);
+        String id = "qa-v150-delete-" + System.currentTimeMillis();
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            waitReady(scenario);
+            authenticateAdmin(scenario);
+            assertEquals("ready", eval(scenario, "typeof BridgeAndroid?.deleteBatch==='function'?'ready':'missing'"));
+            eval(scenario, "(()=>{dbSave('bridges',{id:'" + id + "-bridge',name:'پل حذف مستقیم',code:'QA-DEL',profile:{}});dbSave('inspections',{id:'" + id + "-inspection',status:'پیش‌نویس',workflowStatus:'draft',bridgeId:'" + id + "-bridge'});dbSave('defects',{id:'" + id + "-defect',inspectionId:'" + id + "-inspection'});dbSave('reminders',{id:'" + id + "-reminder',ownerId:'" + id + "-inspection'});return 'saved'})()");
+            // dbSave uses the WebMessage write path; allow its transaction to
+            // reach SQLite before exercising the synchronous delete endpoint.
+            SystemClock.sleep(700);
+            assertEquals("started", eval(scenario, "(()=>{dbDeleteBatch([{kind:'bridges',id:'" + id + "-bridge'},{kind:'inspections',id:'" + id + "-inspection'},{kind:'defects',id:'" + id + "-defect'},{kind:'reminders',id:'" + id + "-reminder'}]).then(r=>window.__qaDeleteResult=r.ok?'ok':'bad');return 'started'})()"));
+            assertEquals("ok", waitForValue(scenario, "window.__qaDeleteResult||'wait'", "ok", 5000));
+            assertEquals("gone", eval(scenario, "['bridges','inspections','defects','reminders'].every(k=>!dbList(k).some(x=>String(x.id).startsWith('" + id + "-')))?'gone':'present'"));
+        }
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            waitReady(scenario);
+            assertEquals("gone", eval(scenario, "['bridges','inspections','defects','reminders'].every(k=>!dbList(k).some(x=>String(x.id).startsWith('" + id + "-')))?'gone':'present'"));
         }
     }
 
@@ -59,6 +76,11 @@ public class DeletionPersistenceInstrumentationTest {
             SystemClock.sleep(150);
         }
         assertEquals("Startup diagnostics: " + eval(scenario, "JSON.stringify({state:document.readyState,url:location.href,db:typeof dbList,inspection:typeof newInspection,version:window.BridgeNativeClient?.appVersion()})"), "ready", value);
+    }
+
+    private static void authenticateAdmin(ActivityScenario<MainActivity> scenario) throws Exception {
+        assertEquals("started", eval(scenario, "(()=>{window.__qaAuth='wait';document.getElementById('authPin').value='135790';document.getElementById('authPinConfirm').value='135790';submitAuthentication().then(()=>window.__qaAuth=Governance.currentUser()?.id||'failed').catch(()=>window.__qaAuth='failed');return 'started'})()"));
+        assertEquals("user-admin", waitForValue(scenario, "window.__qaAuth||'wait'", "user-admin", 10000));
     }
 
     private static String eval(ActivityScenario<MainActivity> scenario, String js) throws Exception {
