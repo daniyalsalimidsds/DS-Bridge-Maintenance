@@ -252,6 +252,7 @@ public final class AppDb extends SQLiteOpenHelper {
 
     public synchronized DeleteResult deleteMany(JSONArray entries) {
         if (entries == null || entries.length() > 5000) throw new IllegalArgumentException("Invalid delete batch");
+        List<String[]> validatedEntries = new ArrayList<>(entries.length());
         SQLiteDatabase sql = getWritableDatabase(); int deleted = 0; Map<String,MediaRecord> media = new LinkedHashMap<>(); sql.beginTransaction();
         try {
             for (int i = 0; i < entries.length(); i++) {
@@ -259,10 +260,10 @@ public final class AppDb extends SQLiteOpenHelper {
                 String kind = entry.optString("kind", ""), id = entry.optString("id", "");
                 if (!kind.matches("[A-Za-z0-9_\\-]{1,80}") || id.isEmpty() || id.length() > 180 || id.indexOf('\0') >= 0) throw new SecurityException("Unsafe delete entry");
                 if (isProtectedFromPhysicalDelete(sql, kind, id)) throw new SecurityException("Protected record cannot be physically deleted: " + kind);
+                validatedEntries.add(new String[]{kind, id});
             }
-            for (int i = 0; i < entries.length(); i++) {
-                JSONObject entry = entries.getJSONObject(i);
-                String kind = entry.getString("kind"), id = entry.getString("id");
+            for (String[] entry : validatedEntries) {
+                String kind = entry[0], id = entry[1];
                 deleted += sql.delete("entities", "kind=? AND eid=?", new String[]{kind, id});
                 String singular = singularOwnerKind(kind);
                 try (Cursor c = sql.query("media", null, "owner_id=? AND (owner_kind=? OR owner_kind=?)", new String[]{id, kind, singular}, null, null, null)) {
