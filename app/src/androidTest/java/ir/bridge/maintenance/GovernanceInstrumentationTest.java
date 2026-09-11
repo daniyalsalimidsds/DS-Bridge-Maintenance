@@ -75,7 +75,12 @@ public class GovernanceInstrumentationTest {
             // A person qualified for both field inspection and QC is still
             // prohibited from approving their own submitted record.
             credentials.authenticate("reviewer-dual", "642086".toCharArray());
-            submit(governance, db, "inspection-qc-self-review", "bridge-qc", "none", false);
+            JSONObject dualSubmission = submissionPayload(db, "inspection-qc-self-review", "bridge-qc", "none", false);
+            JSONObject dualInspection = dualSubmission.getJSONObject("inspection");
+            dualInspection.put("inspectorId", "reviewer-dual").put("inspector", "بازرس و بازبین دوصلاحیتی");
+            dualInspection.getJSONObject("signatureAttachment")
+                    .put("signerId", "reviewer-dual").put("signer", "بازرس و بازبین دوصلاحیتی");
+            governance.dispatch("submitInspection", dualSubmission);
             expectFailure("independent-reviewer-required", () -> governance.dispatch("reviewInspection",
                     reviewPayload("inspection-qc-self-review", "approve")));
 
