@@ -47,6 +47,10 @@ public class GovernanceInstrumentationTest {
             limitedReviewer.getJSONObject("qualification").put("allowedInspectionTypes", new JSONArray().put("بازدید ادواری"));
             governance.dispatch("saveGovernedUser", new JSONObject().put("user", limitedReviewer));
             credentials.enroll("reviewer-limited", "753159".toCharArray());
+            JSONObject dualRoleReviewer = qualifiedUser("reviewer-dual", "بازرس و بازبین دوصلاحیتی",
+                    "بازبین کنترل کیفیت", true, true);
+            governance.dispatch("saveGovernedUser", new JSONObject().put("user", dualRoleReviewer));
+            credentials.enroll("reviewer-dual", "642086".toCharArray());
 
             JSONObject programResult = governance.dispatch("saveInspectionProgram", new JSONObject().put("program",
                     new JSONObject().put("bridgeId", "bridge-qc").put("intervalMonths", 6)
@@ -64,8 +68,16 @@ public class GovernanceInstrumentationTest {
             assertNotNull(db.find("reportRevisions", "submission-inspection-qc-1-1")
                     .getJSONObject("snapshotBundle"));
 
-            expectFailure("independent-reviewer-required", () -> governance.dispatch("reviewInspection",
+            // A field-only inspector is rejected at the role boundary.
+            expectFailure("role-not-authorized", () -> governance.dispatch("reviewInspection",
                     reviewPayload("inspection-qc-1", "approve")));
+
+            // A person qualified for both field inspection and QC is still
+            // prohibited from approving their own submitted record.
+            credentials.authenticate("reviewer-dual", "642086".toCharArray());
+            submit(governance, db, "inspection-qc-self-review", "bridge-qc", "none", false);
+            expectFailure("independent-reviewer-required", () -> governance.dispatch("reviewInspection",
+                    reviewPayload("inspection-qc-self-review", "approve")));
 
             credentials.authenticate("reviewer-limited", "753159".toCharArray());
             expectFailure("inspection-type-not-authorized", () -> governance.dispatch("reviewInspection",

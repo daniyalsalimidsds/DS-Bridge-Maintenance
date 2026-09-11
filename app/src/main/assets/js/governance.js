@@ -898,13 +898,16 @@
 
   async function init() {
     installFallbackHandlers();
-    state.initialized = true;
     await refreshAuthStatus(true);
     renderReviews();
     renderPrograms();
     renderCriticalFindings();
     scheduleCriticalReminders();
     scheduleProgramReminders();
+    // Consumers use this flag as the readiness boundary.  Do not expose a
+    // half-initialized authentication state: on a fresh install that race can
+    // send the first administrator through authenticate() before enrollPin().
+    state.initialized = true;
     document.getElementById('authPin')?.addEventListener('keydown', event => {
       if (event.key === 'Enter') submitAuthentication();
     });
