@@ -2,7 +2,7 @@
 
 ## Scope and release status
 
-Phase A resolves the nine P0 findings in the 65-page audit. It is a development checkpoint, not a v1.7.0 release. The package remains at the v1.6.0 build identity until the final release gate, and P1/P2/P3 work remains open in the master matrix.
+Phase A resolves the nine P0 findings in the 65-page audit. The implementation checkpoint is private-repository commit [`01fa44a`](https://github.com/daniyalsalimidsds/DS-Bridge-Maintenance/commit/01fa44aa6042087642bb1ddc79ed600b913cee6c), verified by GitHub Actions [run #13](https://github.com/daniyalsalimidsds/DS-Bridge-Maintenance/actions/runs/34641947286). It is a development checkpoint, not a v1.7.0 release. The package deliberately remains at the v1.6.0 build identity until the final release gate, and P1/P2/P3 work remains open in the master matrix.
 
 ## Implemented controls
 
@@ -34,7 +34,7 @@ Credentials are intentionally excluded from backup and restore. After a restore,
 
 ## Verification run
 
-| Check | Result at local checkpoint |
+| Check | Result |
 |---|---|
 | `node --test tests/js/*.test.js` | PASS — 25 tests, 0 failed |
 | JavaScript syntax (`node --check`) | PASS — all app asset/data JavaScript files |
@@ -42,6 +42,26 @@ Credentials are intentionally excluded from backup and restore. After a restore,
 | `node tools/audit_scoring_catalog.js` | PASS — 497 current items and 79 reference rows |
 | whitespace/patch validation | PASS — `git diff --check` |
 | Local Gradle/Android build | Not run: Gradle 8.9 is not cached and this runtime cannot reach the distribution host |
-| GitHub Actions Android build, lint and API 30 emulator | Pending until this checkpoint is pushed; the run URL and result must be added before Phase A is closed |
+| GitHub Actions build gate | PASS — `clean testDebugUnitTest lintRelease assembleDebugAndroidTest assembleRelease`; `BUILD SUCCESSFUL`; Java 17 / compile SDK 35 |
+| Android API 30 emulator | PASS — 33 instrumentation tests, 0 failures |
+| Package checkpoint identity | PASS — `ir.bridge.maintenance`, versionCode `10600`, versionName `1.6.0`; the v1.7.0 bump remains reserved for final release QA |
+| Final CI evidence | PASS — [run #13](https://github.com/daniyalsalimidsds/DS-Bridge-Maintenance/actions/runs/34641947286), build job `103403583795`, emulator job `103403584240` |
 
-No APK or release is produced by this phase. A failed CI build or emulator test reopens the affected matrix rows and must be fixed before starting Phase B.
+## CI remediation record
+
+| Run | Result and finding | Corrective action |
+|---|---|---|
+| [#10](https://github.com/daniyalsalimidsds/DS-Bridge-Maintenance/actions/runs/34639960216) at `1d6c177` | Android compilation rejected unchecked `JSONException` calls in the batch-delete mutation loop | `aee2e57` snapshots all validated delete entries before mutation; this also prevents a caller-held JSON array from changing between validation and deletion |
+| [#11](https://github.com/daniyalsalimidsds/DS-Bridge-Maintenance/actions/runs/34640271983) at `aee2e57` | Build/lint passed; emulator exposed a fresh-install authentication readiness race and an imprecise self-review fixture expectation | `4511918` makes authentication initialization atomic, preserves authorization-first error handling, and adds a dual-qualified self-review scenario |
+| [#12](https://github.com/daniyalsalimidsds/DS-Bridge-Maintenance/actions/runs/34641194494) at `4511918` | Build/lint and all four UI tests passed; the new dual-role fixture was correctly rejected because its payload still carried the old inspector identity | `01fa44a` binds both inspector and signature identities to the authenticated dual-qualified fixture |
+| [#13](https://github.com/daniyalsalimidsds/DS-Bridge-Maintenance/actions/runs/34641947286) at `01fa44a` | PASS — build, unit tests, lint, release assembly and all 33 emulator tests | Phase A code gate closed |
+
+## Retained CI artifacts
+
+| Artifact | GitHub artifact ID | Uploaded ZIP SHA-256 |
+|---|---:|---|
+| Build checkpoint (unsigned APK, tested source ZIP, checksums and public signing utility) | `10280661766` | `06a842da22e2c80ef5aa16f9445c6049a9ad40e0c17c0bf7ba7c86c3d85b3814` |
+| Build/lint/unit diagnostics | `10280741558` | `e9c752cb1d9947fef30b1a938add26d14595cf0ceb574420d315531ac9e752e6` |
+| Instrumentation logs and generated QA fixtures | `10280692428` | `dbf33fa8fa36790de639f908a3b852a53c91708314ef6ad90258fff01c6a6334` |
+
+No official or signed release is produced by this phase. The CI APK is an unsigned checkpoint artifact only. A later regression in any Phase A control reopens the affected matrix rows and must be fixed before release.
