@@ -3,4 +3,8 @@ Copyright The Android Open Source Project. Licensed under Apache License, Versio
 Kotlin standard library: Copyright JetBrains s.r.o. and Kotlin Programming Language contributors. Apache License, Version 2.0.
 Persian and Arabic font copyright notices and the SIL Open Font License are in FONT_LICENSES.txt.
 
-Application code and project identity: Daniyal Salimi. No open-source license is granted for the application by these third-party notices.
+DS-Bridge-Maintenance application code and original project documentation:
+Copyright (c) 2026 Daniyal Salimi.
+Licensed under the MIT License; see MIT.txt and the repository root LICENSE.
+Third-party components, fonts and reference materials retain their own licenses
+and copyright notices; the MIT grant does not relicense them.
