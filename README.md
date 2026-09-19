@@ -1,4 +1,29 @@
-# بازرسی پل — Bridge Maintenance 1.6.0
+# Bridge Maintenance — بازرسی پل 1.6.0
+
+> **English:** [Full English README](README.en.md) · **فارسی:** ادامهٔ همین صفحه
+
+**Bridge Maintenance** is an open-source, offline-first Android application for structured bridge inspection, defect documentation, condition assessment, maintenance follow-up, and engineering reporting. It is developed and maintained by **Daniyal Salimi** and released under the **MIT License**.
+
+### Why this project matters
+
+- Provides a reproducible, open implementation of a bridge-inspection workflow instead of keeping the inspection logic in a closed or one-off tool.
+- Connects bridge inventory, a structured defect catalog, photos/GPS evidence, scoring, review controls, and PDF/Excel/CSV/ZIP reporting in one offline workflow.
+- Includes engineering documentation, automated tests, CI, signed release artifacts, checksums, and explicit limitations so technical decisions can be audited.
+- Targets a specialized civil/transportation-infrastructure use case where open-source tooling is comparatively limited, while remaining transparent about its current early-stage adoption.
+
+### Open-source status
+
+- **Primary maintainer:** [Daniyal Salimi](MAINTAINERS.md)
+- **License:** [MIT](LICENSE)
+- **Contributing:** [CONTRIBUTING.md](CONTRIBUTING.md)
+- **Security:** [SECURITY.md](SECURITY.md)
+- **Roadmap:** [docs/ROADMAP.md](docs/ROADMAP.md)
+- **Latest release:** [v1.6.0](https://github.com/daniyalsalimidsds/DS-Bridge-Maintenance/releases/tag/v1.6.0)
+- **QA / verification:** [docs/RELEASE_QA.md](docs/RELEASE_QA.md)
+
+> The repository is a young public OSS project. No claim of broad community adoption or institutional deployment is made unless supported by public evidence. Contributions, field validation, reproducible bug reports, and engineering review are welcome.
+
+---
 
 مجوز کد: [MIT](LICENSE) · [راهنمای مشارکت](CONTRIBUTING.md)
 
