@@ -2,6 +2,8 @@
 
 Thank you for considering a contribution to Bridge Maintenance.
 
+All contributors are expected to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+
 ## Ways to contribute
 
 Useful contributions include reproducible bug reports, Android/device compatibility findings, accessibility and RTL improvements, tests, documentation, engineering review, and carefully justified defect-catalog or scoring changes.

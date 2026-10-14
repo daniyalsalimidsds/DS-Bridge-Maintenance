@@ -1,0 +1,66 @@
+name: "گزارش اعتبارسنجی میدانی / Field validation report"
+description: "مقایسهٔ نمره و ضرایب برنامه با ارزیابی کارشناسی میدانی — Comparison of app scoring/weights against expert field assessment"
+title: "[validation] "
+labels: ["validation", "scoring"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        این قالب برای مستندسازی اعتبارسنجی میدانی روش امتیازدهی است؛ نه برای گزارش باگ نرم‌افزاری.
+        **اطلاعات واقعی پل، موقعیت حساس، عکس شناسایی‌پذیر یا دادهٔ محرمانهٔ سازمان را پیوست نکنید.**
+        This template documents field validation of the scoring method — not software bugs.
+        **Do not attach real bridge identities, sensitive locations, identifiable photos, or confidential organizational data.**
+  - type: input
+    id: app-version
+    attributes:
+      label: "نسخهٔ برنامه / App version"
+      placeholder: "مثلاً 1.6.0 (کد 10600)"
+    validations:
+      required: true
+  - type: dropdown
+    id: method
+    attributes:
+      label: "روش ارزیابی / Assessment method"
+      options:
+        - "شهرداری (کاتالوگ VELAYAT.xlsx)"
+        - "FHWA / SNBI (ارزیابی مستقل B.C.01–B.C.11)"
+        - "هر دو"
+        - "سایر (در توضیحات بنویسید)"
+    validations:
+      required: true
+  - type: textarea
+    id: sample
+    attributes:
+      label: "نمونهٔ بازرسی / Inspection sample"
+      description: "تعداد پل/بازدید، بازهٔ زمانی، نوع پل‌ها (بدون نام واقعی) — number of bridges/visits, period, bridge types (no real names)"
+      placeholder: "مثلاً: ۶ بازدید روی ۴ پل بتنی دال‌وتیر، زمستان ۱۴۰۴"
+    validations:
+      required: true
+  - type: textarea
+    id: comparison
+    attributes:
+      label: "مقایسهٔ نتیجه / Result comparison"
+      description: "نمرهٔ برنامه در برابر قضاوت کارشناسی؛ موارد هم‌راستا و موارد مغایر — app score vs expert judgment; agreements and disagreements"
+      placeholder: "پل A: نمرهٔ برنامه ‎−۱۴۰‎، ارزیابی کارشناس «متوسط رو به ضعیف» — هم‌راستا ..."
+    validations:
+      required: true
+  - type: textarea
+    id: weight-deviations
+    attributes:
+      label: "انحراف ضرایب / Weight deviations"
+      description: "کدام ردیف‌ها ضریبشان با تجربهٔ میدانی نمی‌خواند؟ شناسهٔ ردیف + ضریب فعلی + ضریب پیشنهادی + دلیل — which items' weights disagree with field experience? item id + current weight + proposed weight + reason"
+      placeholder: "ردیف X:12 — ضریب فعلی ۳، پیشنهاد ۵؛ ترک برشی در تیر اصلی ..."
+  - type: textarea
+    id: method-notes
+    attributes:
+      label: "نکته‌های روشی / Method notes"
+      description: "ابهام در تعریف آسیب، وضعیت «ع.ا.ب»، پوشش مشاهده یا هر نکتهٔ روشی دیگر — ambiguous defect definitions, uninspectable status, observation coverage, other method notes"
+  - type: checkboxes
+    id: consent
+    attributes:
+      label: "تأییدها / Confirmations"
+      options:
+        - label: "هیچ دادهٔ واقعی شناسایی‌پذیر (نام پل، مختصات حساس، عکس واقعی) پیوست نکرده‌ام / I attached no identifiable real-world data"
+          required: true
+        - label: "می‌دانم ضرایب پیشنهادی من «پیشنهاد» است و بدون بازبینی نگهدارنده، وزن مصوب محسوب نمی‌شود / I understand my proposed weights are proposals, not approved weights"
+          required: true

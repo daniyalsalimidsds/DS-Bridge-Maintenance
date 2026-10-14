@@ -1,0 +1,28 @@
+# This file enables GitHub's "Cite this repository" button.
+cff-version: 1.2.0
+message: "If you use this software in your work, please cite it as below."
+type: software
+title: "Bridge Maintenance — بازرسی پل"
+abstract: >-
+  Open-source, offline-first Android application for structured bridge
+  inspection, defect documentation, condition assessment, maintenance
+  follow-up, and engineering reporting. Bilingual Persian/English.
+authors:
+  - family-names: Salimi
+    given-names: Daniyal
+    alias: daniyalsalimidsds
+repository-code: "https://github.com/daniyalsalimidsds/DS-Bridge-Maintenance"
+url: "https://github.com/daniyalsalimidsds/DS-Bridge-Maintenance"
+license: MIT
+version: 1.6.0
+date-released: "2026-09-09"
+keywords:
+  - bridge inspection
+  - bridge maintenance
+  - defect catalog
+  - condition assessment
+  - offline-first
+  - android
+  - civil engineering
+  - persian
+  - rtl

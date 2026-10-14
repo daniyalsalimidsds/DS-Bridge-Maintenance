@@ -1,5 +1,10 @@
 # Bridge Maintenance 1.6.0
 
+[![Build and QA](https://github.com/daniyalsalimidsds/DS-Bridge-Maintenance/actions/workflows/bridge-release.yml/badge.svg)](https://github.com/daniyalsalimidsds/DS-Bridge-Maintenance/actions/workflows/bridge-release.yml)
+[![Latest release](https://img.shields.io/github/v/release/daniyalsalimidsds/DS-Bridge-Maintenance)](https://github.com/daniyalsalimidsds/DS-Bridge-Maintenance/releases/latest)
+[![License: MIT](https://img.shields.io/github/license/daniyalsalimidsds/DS-Bridge-Maintenance)](LICENSE)
+[![Cite](https://img.shields.io/badge/cite-CITATION.cff-blue)](CITATION.cff)
+
 Bridge Maintenance is an open-source, offline-first Android application for structured bridge inspection, defect documentation, condition assessment, maintenance follow-up, and engineering reporting.
 
 The project is maintained by **Daniyal Salimi** and released under the **MIT License**.
@@ -35,6 +40,7 @@ Useful references:
 
 - [Scoring methods](docs/SCORING_METHODS.md)
 - [Catalog audit](docs/CATALOG_AUDIT.md)
+- [Field validation protocol](docs/FIELD_VALIDATION.md)
 - [Engineering references](docs/ENGINEERING_REFERENCES.md)
 - [Known limitations](docs/KNOWN_LIMITATIONS.md)
 - [Data dictionary](docs/DATA_DICTIONARY.md)
@@ -75,7 +81,7 @@ Contributions are welcome, especially:
 - documentation improvements,
 - field-validation feedback using non-sensitive data.
 
-Please read [CONTRIBUTING.md](CONTRIBUTING.md) or the [English contribution guide](CONTRIBUTING.en.md) before opening a pull request.
+Please read [CONTRIBUTING.md](CONTRIBUTING.md) or the [English contribution guide](CONTRIBUTING.en.md) before opening a pull request. All contributors are expected to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Maintainer
 

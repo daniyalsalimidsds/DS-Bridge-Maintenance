@@ -1,5 +1,10 @@
 # Bridge Maintenance — بازرسی پل 1.6.0
 
+[![Build and QA](https://github.com/daniyalsalimidsds/DS-Bridge-Maintenance/actions/workflows/bridge-release.yml/badge.svg)](https://github.com/daniyalsalimidsds/DS-Bridge-Maintenance/actions/workflows/bridge-release.yml)
+[![Latest release](https://img.shields.io/github/v/release/daniyalsalimidsds/DS-Bridge-Maintenance)](https://github.com/daniyalsalimidsds/DS-Bridge-Maintenance/releases/latest)
+[![License: MIT](https://img.shields.io/github/license/daniyalsalimidsds/DS-Bridge-Maintenance)](LICENSE)
+[![Cite](https://img.shields.io/badge/cite-CITATION.cff-blue)](CITATION.cff)
+
 > **English:** [Full English README](README.en.md) · **فارسی:** ادامهٔ همین صفحه
 
 **Bridge Maintenance** is an open-source, offline-first Android application for structured bridge inspection, defect documentation, condition assessment, maintenance follow-up, and engineering reporting. It is developed and maintained by **Daniyal Salimi** and released under the **MIT License**.
@@ -16,6 +21,7 @@
 - **Primary maintainer:** [Daniyal Salimi](MAINTAINERS.md)
 - **License:** [MIT](LICENSE)
 - **Contributing:** [CONTRIBUTING.md](CONTRIBUTING.md)
+- **Code of conduct:** [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
 - **Security:** [SECURITY.md](SECURITY.md)
 - **Roadmap:** [docs/ROADMAP.md](docs/ROADMAP.md)
 - **Latest release:** [v1.6.0](https://github.com/daniyalsalimidsds/DS-Bridge-Maintenance/releases/tag/v1.6.0)
@@ -73,6 +79,7 @@
 
 - [روش محاسبه و مثال‌ها](docs/SCORING_METHODS.md)
 - [ممیزی تطبیق فهرست و ضرایب](docs/CATALOG_AUDIT.md)
+- [پروتکل اعتبارسنجی میدانی ضرایب](docs/FIELD_VALIDATION.md)
 - [مراجع رسمی و ایده‌های طراحی](docs/ENGINEERING_REFERENCES.md)
 - [تغییرات نسخه‌ها](docs/CHANGELOG.md)، [مدل داده](docs/DATA_DICTIONARY.md)، [محدودیت‌های عملی](docs/KNOWN_LIMITATIONS.md)
 

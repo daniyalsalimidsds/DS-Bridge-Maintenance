@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: "گزارش امنیتی / Security report"
+    url: https://github.com/daniyalsalimidsds/DS-Bridge-Maintenance/blob/main/SECURITY.md
+    about: "آسیب‌پذیری امنیتی را عمومی نکنید — ابتدا راهنمای گزارش خصوصی را بخوانید. Do not disclose vulnerabilities publicly; read the private-reporting guide first."
+  - name: "مستندات مهندسی / Engineering docs"
+    url: https://github.com/daniyalsalimidsds/DS-Bridge-Maintenance/tree/main/docs
+    about: "روش محاسبه، ممیزی کاتالوگ، محدودیت‌ها و نقشهٔ راه. Scoring methods, catalog audit, limitations, roadmap."
