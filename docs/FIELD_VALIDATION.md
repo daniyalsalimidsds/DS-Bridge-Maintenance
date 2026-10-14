@@ -56,3 +56,4 @@
 ## English summary
 
 This document defines the field-validation protocol for the app's scoring weights. Proposed weights (`sourceType: proposed`) remain proposals until **at least two independent field observations** confirm them and the maintainer reviews and records the decision. Studies follow a blind dual-assessment procedure (app inspection + independent expert judgment), report disagreements item-by-item, and are submitted via the *field validation report* issue template. No identifiable real-world bridge data may be attached. Accepted changes are recorded in `CATALOG_AUDIT.md` and `CHANGELOG.md`; the app score remains a screening aid, not an engineering verdict.
+
